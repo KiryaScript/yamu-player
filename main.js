@@ -16,16 +16,25 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200, height: 800,
     frame: false, transparent: false, backgroundColor: '#0a0a0c',
+    // Иконка для панели задач и окна
+    icon: path.join(__dirname, 'icon.ico'), 
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true, nodeIntegration: false, webSecurity: false
     }
   });
-  mainWindow.loadURL('http://localhost:5173');
+
+  // === ВАЖНОЕ ИСПРАВЛЕНИЕ ДЛЯ СБОРКИ ===
+  if (app.isPackaged) {
+    // В собранном приложении грузим файл
+    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+  } else {
+    // В режиме разработки грузим localhost
+    mainWindow.loadURL('http://localhost:5173');
+  }
 }
 
 // === DISCORD RPC ===
-// !!! ВСТАВЬ СЮДА СВОЙ НАСТОЯЩИЙ CLIENT ID ИЗ DISCORD DEVELOPER PORTAL !!!
 const clientId = '1451704699173470382'; 
 
 ipcMain.handle('set-discord-status', async (event, payload) => {
@@ -48,10 +57,7 @@ ipcMain.handle('set-discord-status', async (event, payload) => {
         }
 
         // === ДЕБАГ ===
-        // Если снова undefined - посмотри, что выведет эта строка в терминале
-        // console.log("Пришел трек:", JSON.stringify(track));
-
-        console.log(`[Discord] ${track.artist} - ${track.title}`);
+        // console.log(`[Discord] ${track.artist} - ${track.title}`);
 
         let details = (track.title && String(track.title).trim()) ? String(track.title) : 'Трек';
         let state = (track.artist && String(track.artist).trim()) ? String(track.artist) : 'Исполнитель';
@@ -62,8 +68,8 @@ ipcMain.handle('set-discord-status', async (event, payload) => {
         await rpcClient.setActivity({
             details: details.substring(0, 127),
             state: state.substring(0, 127),
-            //largeImageKey: 'YAMU_Player_logo', // Должно совпадать с именем в Discord Assets
-            //largeImageText: 'YAMU Player',
+            // largeImageKey: 'yamu_logo', // Раскомментируй, если загрузил картинку в Discord Portal
+            // largeImageText: 'YAMU Player',
             smallImageKey: isPlaying ? 'play' : 'pause',
             smallImageText: isPlaying ? 'Playing' : 'Paused',
             instance: false,

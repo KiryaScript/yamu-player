@@ -1,0 +1,8 @@
+version: 1.0.0
+files:
+  - url: YAMU-Setup-1.0.0.exe
+    sha512: bfIunMSFcpjjmDR3iT5WfonOFF/QaxWwH0DC4Jps6hgnZXtamd584Q7qyAS5efStmPc089AylMbhLcnEcXq+LA==
+    size: 76622675
+path: YAMU-Setup-1.0.0.exe
+sha512: bfIunMSFcpjjmDR3iT5WfonOFF/QaxWwH0DC4Jps6hgnZXtamd584Q7qyAS5efStmPc089AylMbhLcnEcXq+LA==
+releaseDate: '2025-12-20T09:48:33.855Z'
