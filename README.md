@@ -5,7 +5,7 @@
 ⚠️ **Статус проекта: Ранняя стадия разработки.**
 Приложение находится в активной фазе создания. Возможны баги, нестабильная работа и резкие изменения в интерфейсе. Мы строим "космолет", но пока прикрутили только двигатели и кресло пилота.
 
-![YAMU WIP](https://drive.google.com/file/d/1BSEJDFjE-nuPFyu2z1U56Goafr-_i-un/view?usp=sharing)
+![YAMU WIP]([https://drive.google.com/file/d/1BSEJDFjE-nuPFyu2z1U56Goafr-_i-un/view?usp=sharing](https://github.com/KiryaScript/yamu-player/blob/main/%D0%A1%D0%BD%D0%B8%D0%BC%D0%BE%D0%BA%20%D1%8D%D0%BA%D1%80%D0%B0%D0%BD%D0%B0%202025-12-20%20034811.png))
 
 ## 🚀 Что уже работает
 
