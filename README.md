@@ -44,8 +44,8 @@
 
 1.  **Клонируй репозиторий:**
     ```bash
-    git clone [https://github.com/your-username/yamu.git](https://github.com/your-username/yamu.git)
-    cd yamu
+    git clone [https://github.com/KiryaScript/yamu-player.git](https://github.com/KiryaScript/yamu-player.git)
+    cd yamu-player
     ```
 
 2.  **Установи зависимости:**
