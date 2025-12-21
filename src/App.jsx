@@ -1,8 +1,15 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Heart, Search, Home, RefreshCw, Music, Volume2, Disc, ListMusic, User, X, ArrowLeft, Radio, Sliders, Settings, LogOut, Shield, Zap, Database, Monitor } from 'lucide-react';
+// ПОЛИФИЛЛ ДЛЯ ИСПРАВЛЕНИЯ ОШИБКИ UNDICI
+if (typeof File === 'undefined') global.File = class File {};
 
+const { app, BrowserWindow, ipcMain, session, shell } = require('electron');
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Heart, Search, Home, RefreshCw, Music, Volume2, Disc, ListMusic, User, X, ArrowLeft, Radio, Sliders, Settings, LogOut, Shield, Zap, Database, Check } from 'lucide-react';
+
+// Частоты эквалайзера
 const FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
+// Анимация на обложке
 const EqualizerAnim = () => (
   <div className="flex items-end gap-[2px] h-4 w-4">
     <div className="w-1 bg-green-400 h-full equalizer-bar delay-1 rounded-sm"></div>
@@ -13,6 +20,7 @@ const EqualizerAnim = () => (
 );
 
 function App() {
+  // === СОСТОЯНИЕ ===
   const [userData, setUserData] = useState(null);
   const [activeView, setActiveView] = useState('home'); 
   const [viewTitle, setViewTitle] = useState('Главная');
@@ -22,6 +30,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
 
+  // Плеер
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,23 +38,26 @@ function App() {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
 
-  // === ВСЕ НАСТРОЙКИ ===
+  // Настройки
   const [settings, setSettings] = useState({
       hq: true,
       normalization: false,
-      discordRPC: true, // По умолчанию включено
+      discordRPC: true,
       hardwareAccel: true
   });
 
+  // Эквалайзер UI
   const [showEq, setShowEq] = useState(false);
   const [eqGains, setEqGains] = useState(new Array(10).fill(0));
 
+  // Web Audio Refs
   const audioRef = useRef(new Audio());
   const audioContextRef = useRef(null);
   const sourceNodeRef = useRef(null);
   const filtersRef = useRef([]);
   const compressorRef = useRef(null);
 
+  // === АУДИО ДВИЖОК ===
   useEffect(() => {
     if (!audioContextRef.current) {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -56,6 +68,7 @@ function App() {
         const source = ctx.createMediaElementSource(audioRef.current);
         sourceNodeRef.current = source;
 
+        // Создаем фильтры EQ
         const filters = FREQUENCIES.map((freq) => {
             const filter = ctx.createBiquadFilter();
             filter.type = 'peaking';
@@ -66,6 +79,7 @@ function App() {
         });
         filtersRef.current = filters;
 
+        // Создаем компрессор (для нормализации)
         const compressor = ctx.createDynamicsCompressor();
         compressor.threshold.value = -24;
         compressor.knee.value = 30;
@@ -74,6 +88,7 @@ function App() {
         compressor.release.value = 0.25;
         compressorRef.current = compressor;
 
+        // Собираем цепь: Source -> Filters -> Out
         let prevNode = source;
         filters.forEach((filter) => {
             prevNode.connect(filter);
@@ -83,49 +98,47 @@ function App() {
     }
   }, []);
 
+  // Обновление EQ
   useEffect(() => {
     filtersRef.current.forEach((filter, index) => {
         if (filter) filter.gain.value = eqGains[index];
     });
   }, [eqGains]);
 
+  // Обновление Нормализации (вкл/выкл компрессора)
   useEffect(() => {
       if (!audioContextRef.current) return;
       const ctx = audioContextRef.current;
       const lastFilter = filtersRef.current[filtersRef.current.length - 1];
       const compressor = compressorRef.current;
-      lastFilter.disconnect();
-      compressor.disconnect();
-      if (settings.normalization) {
-          lastFilter.connect(compressor);
-          compressor.connect(ctx.destination);
-      } else {
-          lastFilter.connect(ctx.destination);
-      }
+      
+      try {
+        lastFilter.disconnect();
+        compressor.disconnect();
+        
+        if (settings.normalization) {
+            lastFilter.connect(compressor);
+            compressor.connect(ctx.destination);
+        } else {
+            lastFilter.connect(ctx.destination);
+        }
+      } catch (e) { /* ignore connection errors */ }
   }, [settings.normalization]);
 
- // === DISCORD RPC EFFECT ===
+  // === DISCORD RPC ===
   useEffect(() => {
       if (settings.discordRPC) {
-          // Упаковываем всё в один объект data
           if (currentTrack) {
-              window.api.setDiscordStatus({ 
-                  track: currentTrack, 
-                  isPlaying: isPlaying 
-              });
+              window.api.setDiscordStatus({ track: currentTrack, isPlaying });
           } else {
-              window.api.setDiscordStatus({ 
-                  track: null, 
-                  isPlaying: false 
-              });
+              window.api.setDiscordStatus({ track: null, isPlaying: false });
           }
       }
   }, [currentTrack, isPlaying, settings.discordRPC]);
 
-  const toggleSetting = (key) => {
-      setSettings(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
+  // === ЛОГИКА ===
+  const toggleSetting = (key) => setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  
   const handleEqChange = (index, val) => {
       const newGains = [...eqGains];
       newGains[index] = Number(val);
@@ -143,8 +156,9 @@ function App() {
       let user = userData;
       if (!user) {
         user = await window.api.getUserData();
-        if (user && user.login) setUserData(user);
+        if (user) setUserData(user);
       }
+
       if (activeView === 'settings') { setIsLoading(false); return; }
 
       let data = [];
@@ -156,19 +170,34 @@ function App() {
          data = await window.api.getChart();
          setTrackList(data || []);
       } else if (activeView === 'vibe') {
-         setViewTitle("Моя волна");
-         if (trackList.length === 0) {
-             data = await window.api.getRotor();
-             setTrackList(data || []);
+         if (user) {
+             setViewTitle("Моя волна (Лента)");
+             if (trackList.length === 0) {
+                 data = await window.api.getRotor();
+                 setTrackList(data || []);
+             }
+         } else {
+             alert("Моя Волна доступна только после входа.");
+             navigate('home');
          }
-      } else if (activeView === 'likes' && user) {
-         setViewTitle("Мне нравится");
-         data = await window.api.getLikes(user.login);
-         setTrackList(data || []);
-      } else if (activeView === 'collection' && user) {
-         setViewTitle("Коллекция плейлистов");
-         const pl = await window.api.getPlaylists(user.login);
-         setPlaylists(pl || []);
+      } else if (activeView === 'likes') {
+         if (user) {
+             setViewTitle("Мне нравится");
+             data = await window.api.getLikes(user.login);
+             setTrackList(data || []);
+         } else {
+             setViewTitle("Войдите в аккаунт");
+             setTrackList([]);
+         }
+      } else if (activeView === 'collection') {
+         if (user) {
+             setViewTitle("Коллекция плейлистов");
+             const pl = await window.api.getPlaylists(user.login);
+             setPlaylists(pl || []);
+         } else {
+             setViewTitle("Войдите в аккаунт");
+             setPlaylists([]);
+         }
       }
     } catch (e) { console.error("Load Error:", e); }
     setIsLoading(false);
@@ -201,22 +230,31 @@ function App() {
 
   const playTrack = async (track) => {
     if (!track || !track.id) return;
-    if (audioContextRef.current?.state === 'suspended') audioContextRef.current.resume();
+    
+    // Resume AudioContext context if suspended
+    if (audioContextRef.current?.state === 'suspended') {
+        audioContextRef.current.resume();
+    }
 
     if (currentTrack?.id === track.id) {
       if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
       else { audioRef.current.play(); setIsPlaying(true); }
       return;
     }
+    
     try {
       setCurrentTrack(track);
       setIsPlaying(false);
       setCurrentTime(0);
+      
       const url = await window.api.getTrackUrl(track.id, settings.hq);
       if (url) {
         audioRef.current.src = url;
         audioRef.current.play();
         setIsPlaying(true);
+      } else {
+        alert("Не удалось загрузить трек (возможно, он недоступен)");
+        playNext(); // Пропускаем
       }
     } catch (e) { console.error("Play Error:", e); }
   };
@@ -257,7 +295,11 @@ function App() {
   useEffect(() => {
     const hk = (e) => {
       if (e.target.tagName === 'INPUT') return;
-      if (e.code === 'Space') { e.preventDefault(); if(currentTrack) isPlaying ? audioRef.current.pause() : audioRef.current.play(); setIsPlaying(!isPlaying); }
+      if (e.code === 'Space') { 
+          e.preventDefault(); 
+          if(currentTrack) isPlaying ? audioRef.current.pause() : audioRef.current.play(); 
+          setIsPlaying(!isPlaying); 
+      }
     };
     window.addEventListener('keydown', hk);
     return () => window.removeEventListener('keydown', hk);
@@ -301,16 +343,20 @@ function App() {
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={handleSearch} placeholder="Поиск..." className="bg-transparent border-none outline-none text-sm w-full placeholder-white/30" />
             {isSearching && <X size={14} className="cursor-pointer opacity-50 hover:opacity-100" onClick={() => navigate('home')}/>}
           </div>
+          
           <div className="space-y-1">
              <MenuItem icon={<Home size={20}/>} text="Главная" active={activeView === 'home' && !isSearching} onClick={() => navigate('home')} />
              <MenuItem icon={<Radio size={20}/>} text="Моя волна" active={activeView === 'vibe' && !isSearching} onClick={() => navigate('vibe')} />
              <MenuItem icon={<ListMusic size={20}/>} text="Коллекция" active={activeView === 'collection' && !isSearching} onClick={() => navigate('collection')} />
           </div>
+          
           <div className="h-[1px] bg-white/10 mx-2"></div>
+          
           <div className="space-y-1 overflow-y-auto custom-scroll pr-1 flex-1">
              <MenuItem icon={<Heart size={18} className="text-red-400"/>} text="Мне нравится" active={activeView === 'likes' && !isSearching} onClick={() => navigate('likes')}/>
              <MenuItem icon={<Settings size={18}/>} text="Настройки" active={activeView === 'settings'} onClick={() => navigate('settings')}/>
           </div>
+          
           <div className="mt-auto flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 cursor-pointer transition" onClick={() => window.api.login().then(loadData)}>
              <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold text-white shadow-lg">
                 {userData ? userData.login[0].toUpperCase() : <User size={14}/>}
@@ -331,7 +377,7 @@ function App() {
 
              <div className="flex-1 overflow-y-auto p-4 custom-scroll">
                 
-                {/* --- НАСТРОЙКИ (ПОЛНЫЙ ФАРШ) --- */}
+                {/* --- НАСТРОЙКИ --- */}
                 {activeView === 'settings' && (
                     <div className="max-w-3xl mx-auto space-y-8 p-4">
                         <section className="space-y-4">
@@ -353,44 +399,17 @@ function App() {
                         <section className="space-y-4">
                             <h2 className="text-lg font-bold flex items-center gap-2"><Zap size={20}/> Аудио</h2>
                             <div className="bg-white/5 rounded-2xl p-1 space-y-1">
-                                <SettingItem 
-                                    title="Высокое качество (HQ)" 
-                                    desc="Загружать треки в 320kbps (требует перезапуск трека)" 
-                                    active={settings.hq}
-                                    onClick={() => toggleSetting('hq')}
-                                />
-                                <SettingItem 
-                                    title="Нормализация громкости" 
-                                    desc="Автоматически выравнивать громкость разных треков" 
-                                    active={settings.normalization}
-                                    onClick={() => toggleSetting('normalization')}
-                                />
+                                <SettingItem title="Высокое качество (HQ)" desc="Загружать треки 320kbps (перезапусти трек)" active={settings.hq} onClick={() => toggleSetting('hq')} />
+                                <SettingItem title="Нормализация громкости" desc="Выравнивать громкость разных треков" active={settings.normalization} onClick={() => toggleSetting('normalization')} />
                             </div>
                         </section>
 
                         <section className="space-y-4">
                             <h2 className="text-lg font-bold flex items-center gap-2"><Shield size={20}/> Система</h2>
                             <div className="bg-white/5 rounded-2xl p-1 space-y-1">
-                                <SettingItem 
-                                    title="Discord Rich Presence" 
-                                    desc="Показывать текущий трек в статусе Discord" 
-                                    active={settings.discordRPC}
-                                    onClick={() => toggleSetting('discordRPC')}
-                                />
-                                <SettingItem 
-                                    title="Аппаратное ускорение" 
-                                    desc="Использовать GPU для интерфейса (требует перезагрузки)" 
-                                    active={settings.hardwareAccel}
-                                    onClick={() => toggleSetting('hardwareAccel')}
-                                />
+                                <SettingItem title="Discord Rich Presence" desc="Показывать статус в Discord" active={settings.discordRPC} onClick={() => toggleSetting('discordRPC')} />
                                 <div className="flex items-center justify-between p-4 hover:bg-white/5 rounded-xl transition cursor-pointer" onClick={clearCache}>
-                                    <div className="flex items-center gap-4">
-                                        <Database size={20} className="opacity-50"/>
-                                        <div>
-                                            <div className="font-medium">Очистить кэш</div>
-                                            <div className="text-xs opacity-40">Освободит место на диске</div>
-                                        </div>
-                                    </div>
+                                    <div className="flex items-center gap-4"><Database size={20} className="opacity-50"/><div><div className="font-medium">Очистить кэш</div><div className="text-xs opacity-40">Освободит место</div></div></div>
                                     <button className="text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded hover:bg-red-500/30">Очистить</button>
                                 </div>
                             </div>
@@ -398,7 +417,7 @@ function App() {
                     </div>
                 )}
 
-                {/* СПИСКИ (НЕ МЕНЯЛИСЬ) */}
+                {/* --- СПИСКИ ТРЕКОВ --- */}
                 {activeView !== 'settings' && activeView !== 'collection' && (
                     <div className="space-y-1">
                         {trackList.map((track, index) => {
@@ -443,7 +462,7 @@ function App() {
       {/* НИЖНИЙ ПЛЕЕР */}
       <div className="h-24 mx-4 mb-4 glass-player rounded-[28px] flex items-center justify-between px-8 relative z-50">
         
-        {/* EQ POPUP (FIXED: VERTICAL SLIDERS) */}
+        {/* EQ POPUP (VERTICAL) */}
         {showEq && (
             <div className="absolute bottom-28 right-0 w-[400px] h-[220px] glass-panel rounded-3xl p-6 z-[100] eq-popup flex flex-col no-drag">
                 <div className="flex justify-between items-center mb-2">
@@ -453,7 +472,6 @@ function App() {
                 <div className="flex-1 flex justify-between items-center px-2 gap-2">
                     {FREQUENCIES.map((freq, i) => (
                         <div key={freq} className="flex flex-col items-center h-full justify-end w-6 gap-2">
-                            {/* ТУТ ИСПОЛЬЗУЕМ НОВЫЙ КЛАСС eq-range-vertical */}
                             <input 
                                 type="range" 
                                 min="-12" max="12" step="1"
@@ -473,8 +491,8 @@ function App() {
               {currentTrack?.cover ? <img src={currentTrack.cover} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center bg-gray-900"><Music className="opacity-20"/></div>}
            </div>
            <div className="min-w-0 flex flex-col justify-center">
-             <div className="font-bold text-sm leading-tight truncate pr-4">{currentTrack?.title || "Yandex.OS Music"}</div>
-             <div className="text-xs opacity-50 truncate mt-1">{currentTrack?.artist || "Готов к работе"}</div>
+             <div className="font-bold text-sm leading-tight truncate pr-4">{currentTrack?.title || "YAMU"}</div>
+             <div className="text-xs opacity-50 truncate mt-1">{currentTrack?.artist || "Ready"}</div>
            </div>
            <Heart size={18} className={`cursor-pointer transition hover:scale-110 ml-2 ${currentTrack ? 'opacity-40 hover:opacity-100 hover:text-red-500' : 'opacity-0'}`} />
         </div>
@@ -503,7 +521,6 @@ function App() {
            <button onClick={() => setShowEq(!showEq)} className={`p-2 rounded-full transition ${showEq ? 'bg-white text-black' : 'hover:bg-white/10 text-white'}`}>
              <Sliders size={18} />
            </button>
-
            <Volume2 size={18} className="opacity-50"/>
            <div className="w-24 h-full flex items-center relative group">
                <div className="absolute left-0 right-0 h-1 bg-white/10 rounded-full pointer-events-none">
