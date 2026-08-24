@@ -1,0 +1,21 @@
+{
+  "name": "YandexMusic",
+  "version": "5.116.3",
+  "description": "Персональные рекомендации, подборки на любой случай и музыкальные новинки",
+  "author": "Яндекс Музыка <music@support.yandex.ru>",
+  "homepage": "https://music.yandex.ru/download/",
+  "main": "./index.js",
+  "dependencies": {
+    "@formatjs/icu-messageformat-parser": "~2.11.3",
+    "@yandex-music-int/electron-certificate-verification": "~0.0.1-canary-7cde337ab64229053db49b22b436a9788aac602b",
+    "electron-log": "~5.4.3",
+    "electron-store": "~8.2.0",
+    "electron-updater": "~6.6.2",
+    "file-type": "~22.0.1",
+    "intl-messageformat": "~10.7.17",
+    "node-cron": "~4.2.1",
+    "node-id3": "^0.2.9",
+    "semver": "~7.7.3",
+    "uuid": "~13.0.0"
+  }
+}
