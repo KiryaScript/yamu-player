@@ -1,24 +1,29 @@
-# Logs
-logs
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs & binaries
+dist/
+build/
+*.exe
+*.zip
+*.7z
+*.asar
+app_source/
+extracted_installer/
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs & Temporary Data
 *.log
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.idea/
+.vscode/
+*.tmp
+*.bak
+ModData/
+liked_tracks_auto_backup.json

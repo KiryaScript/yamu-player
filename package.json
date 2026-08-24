@@ -1,0 +1,23 @@
+{
+  "name": "yandex-music-enhanced-mod",
+  "version": "5.116.3-mod.2.5",
+  "description": "Enhanced mod for Yandex Music desktop client featuring Discord RPC, Downloader, AMOLED theme, and Library Backup.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node test/test_mod_suite.js",
+    "build": "node tools/build_and_patch.js"
+  },
+  "keywords": [
+    "yandex-music",
+    "discord-rpc",
+    "music-downloader",
+    "electron-mod",
+    "amoled-theme"
+  ],
+  "author": "KiryaScript",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KiryaScript/yamu-player.git"
+  }
+}
