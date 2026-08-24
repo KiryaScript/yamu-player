@@ -1,0 +1,619 @@
+/* Yandex Music Enhanced Mod Styles */
+
+/* 1. Mod Control Button in Sidebar / Top */
+.ym-mod-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin: 6px 12px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 204, 0, 0.15), rgba(255, 106, 0, 0.15));
+  border: 1px solid rgba(255, 204, 0, 0.3);
+  color: #ffcc00;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+.ym-mod-nav-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 204, 0, 0.25), rgba(255, 106, 0, 0.25));
+  border-color: rgba(255, 204, 0, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 204, 0, 0.2);
+}
+
+/* 2. Player Bar Download Button */
+.ym-mod-player-dl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  margin: 0 4px;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+.ym-mod-player-dl-btn:hover {
+  background: rgba(255, 204, 0, 0.25);
+  color: #ffcc00;
+  transform: scale(1.1);
+}
+.ym-mod-player-dl-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+/* 3. Header Action Download Buttons (Albums/Playlists) */
+.ym-mod-header-dl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 24px;
+  background: #ffcc00;
+  color: #000;
+  font-weight: 700;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 12px;
+  -webkit-app-region: no-drag;
+}
+.ym-mod-header-dl-btn:hover {
+  background: #ffd633;
+  transform: scale(1.03);
+  box-shadow: 0 4px 16px rgba(255, 204, 0, 0.35);
+}
+
+/* 4. Track List Row Download Button */
+.ym-mod-track-dl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: 6px;
+}
+.ym-mod-track-dl-btn:hover {
+  background: rgba(255, 204, 0, 0.2);
+  color: #ffcc00;
+}
+
+/* 5. Mod Center Modal Overlay */
+#ym-mod-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: ymFadeIn 0.2s ease-out;
+}
+@keyframes ymFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+#ym-mod-modal {
+  width: 640px;
+  max-width: 90vw;
+  max-height: 85vh;
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 204, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #f4f4f5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.ym-mod-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ym-mod-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+.ym-mod-title .badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #ffcc00;
+  color: #000;
+  font-weight: 800;
+}
+.ym-mod-close-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: all 0.15s;
+}
+.ym-mod-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* Tabs */
+.ym-mod-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 8px;
+}
+.ym-mod-tab {
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ym-mod-tab.active {
+  background: rgba(255, 204, 0, 0.15);
+  color: #ffcc00;
+}
+.ym-mod-tab:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+/* Body */
+.ym-mod-body {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+}
+
+.ym-mod-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.ym-mod-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffcc00;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Form items */
+.ym-mod-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ym-mod-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ym-mod-label-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f4f4f5;
+}
+.ym-mod-label-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Switch */
+.ym-mod-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.ym-mod-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.ym-mod-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.2);
+  transition: 0.2s;
+  border-radius: 24px;
+}
+.ym-mod-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+input:checked + .ym-mod-slider {
+  background-color: #ffcc00;
+}
+input:checked + .ym-mod-slider:before {
+  transform: translateX(20px);
+  background-color: #000;
+}
+
+/* Sliders */
+.ym-mod-range-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.ym-mod-range {
+  flex: 1;
+  accent-color: #ffcc00;
+  cursor: pointer;
+}
+.ym-mod-range-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffcc00;
+  min-width: 50px;
+  text-align: right;
+}
+
+/* Preset buttons */
+.ym-mod-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ym-mod-preset-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e4e4e7;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ym-mod-preset-btn:hover {
+  background: rgba(255, 204, 0, 0.2);
+  color: #ffcc00;
+  border-color: rgba(255, 204, 0, 0.4);
+}
+
+/* Inputs & Buttons */
+.ym-mod-input-group {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.ym-mod-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+}
+.ym-mod-input:focus {
+  border-color: #ffcc00;
+}
+.ym-mod-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.ym-mod-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.ym-mod-btn-primary {
+  background: #ffcc00;
+  border-color: #ffcc00;
+  color: #000;
+  font-weight: 700;
+}
+.ym-mod-btn-primary:hover {
+  background: #ffd633;
+}
+
+/* Select */
+.ym-mod-select {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* 6. Toast Notifications */
+#ym-mod-toast-container {
+  position: fixed;
+  bottom: 90px;
+  right: 24px;
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.ym-mod-toast {
+  background: rgba(24, 24, 27, 0.95);
+  border: 1px solid rgba(255, 204, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  border-radius: 12px;
+  padding: 12px 18px;
+  color: #fff;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 280px;
+  max-width: 400px;
+  animation: ymToastSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+}
+@keyframes ymToastSlide {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.ym-mod-toast.success { border-color: #10b981; }
+.ym-mod-toast.error { border-color: #ef4444; }
+.ym-mod-toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: #ffcc00;
+  border-radius: 0 0 12px 12px;
+  transition: width 0.1s linear;
+}
+
+/* 7. Comprehensive AMOLED True Black Theme */
+body.ym-oled-theme,
+body.ym-oled-theme html,
+body.ym-oled-theme :root {
+  --ym-background-color-primary-enabled-basic: #000000 !important;
+  --ym-background-color-primary-enabled-accent: #000000 !important;
+  --ym-background-color-secondary-enabled-basic: #060606 !important;
+  --ym-background-color-tertiary-enabled-basic: #0d0d0d !important;
+  --ym-background-color-quaternary-enabled-basic: #141414 !important;
+  --ym-surface-color-primary: #000000 !important;
+  --ym-surface-color-secondary: #060606 !important;
+  --ym-surface-color-tertiary: #0d0d0d !important;
+  --ym-card-background: #060606 !important;
+  --ym-color-surface-base: #000000 !important;
+  --ym-color-surface-elevated: #060606 !important;
+  --ym-color-surface-higher: #0d0d0d !important;
+  background-color: #000000 !important;
+}
+
+body.ym-oled-theme,
+body.ym-oled-theme html,
+body.ym-oled-theme #__next,
+body.ym-oled-theme main,
+body.ym-oled-theme aside,
+body.ym-oled-theme nav,
+body.ym-oled-theme header,
+body.ym-oled-theme footer,
+body.ym-oled-theme section,
+body.ym-oled-theme [class*="layout"],
+body.ym-oled-theme [class*="Layout"],
+body.ym-oled-theme [class*="sidebar"],
+body.ym-oled-theme [class*="Sidebar"],
+body.ym-oled-theme [class*="content"],
+body.ym-oled-theme [class*="Content"],
+body.ym-oled-theme [class*="background"],
+body.ym-oled-theme [class*="Background"],
+body.ym-oled-theme [class*="canvas"],
+body.ym-oled-theme [class*="Canvas"],
+body.ym-oled-theme [class*="Vibe"],
+body.ym-oled-theme [class*="vibe"],
+body.ym-oled-theme [class*="pageContainer"],
+body.ym-oled-theme [class*="PageContainer"],
+body.ym-oled-theme [class*="stickyContainer"],
+body.ym-oled-theme [class*="StickyContainer"],
+body.ym-oled-theme [class*="Main_root"],
+body.ym-oled-theme [class*="desktop"],
+body.ym-oled-theme [class*="PlayerBar"] {
+  background-color: #000000 !important;
+  background-image: none !important;
+}
+
+body.ym-oled-theme [class*="Card_root"],
+body.ym-oled-theme [class*="card_root"],
+body.ym-oled-theme [class*="Track_root"]:hover,
+body.ym-oled-theme [class*="TrackItem"]:hover {
+  background-color: #0c0c0c !important;
+}
+
+/* 8. Hide Plus Paywalls & Upsell Banners */
+[class*="PaywallBanner"],
+[class*="paywallBanner"],
+[class*="PlusPromo"],
+[class*="plusPromo"],
+[class*="TrialBanner"],
+[class*="trialBanner"],
+[class*="SubscribeBanner"],
+[class*="subscribeBanner"],
+[class*="CpaBanner"],
+[class*="cpaBanner"],
+[class*="CpaPlayerBar"],
+[class*="cpaPlayerBar"],
+[class*="SidebarPlus"],
+[class*="sidebarPlus"],
+[class*="Sidebar_plus"],
+[class*="SidebarPromo"],
+[class*="PlayerBar_cpa"],
+[class*="PlayerBar_banner"],
+[class*="PromoBanner_root"],
+[class*="promoBanner"],
+[class*="FreePlaybackBanner"],
+[class*="freemiumBanner"] {
+  display: none !important;
+}
+
+/* 9. Changelog Modal Styles */
+#ym-changelog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: ymFadeIn 0.2s ease-out;
+}
+
+#ym-changelog-modal {
+  background: #141416;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  width: 750px;
+  max-width: 92vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  color: #fff;
+}
+
+.ym-changelog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  background: #18181b;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ym-changelog-title {
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+}
+
+.ym-changelog-body {
+  padding: 24px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #d1d5db;
+}
+
+.ym-changelog-body h1 {
+  font-size: 20px;
+  color: #ffcc00;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+.ym-changelog-body h2 {
+  font-size: 17px;
+  color: #fff;
+  margin-top: 20px;
+  margin-bottom: 12px;
+}
+
+.ym-changelog-body h3 {
+  font-size: 15px;
+  color: #fbbf24;
+  margin-top: 14px;
+  margin-bottom: 8px;
+}
+
+.ym-changelog-body ul {
+  padding-left: 20px;
+  margin-bottom: 14px;
+}
+
+.ym-changelog-body li {
+  margin-bottom: 6px;
+}
+
+.ym-changelog-body hr {
+  border: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 20px 0;
+}
+
+.ym-changelog-body code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  color: #facc15;
+}
+
+.ym-changelog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: #18181b;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
