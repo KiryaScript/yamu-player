@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Release](https://img.shields.io/badge/Release-v5.116.3--mod.2.5-brightgreen.svg?style=flat-square)](https://github.com/KiryaScript/yamu-player)
+[![Release](https://img.shields.io/badge/Release-v5.116.3--mod.2.6-brightgreen.svg?style=flat-square)](https://github.com/KiryaScript/yamu-player/releases/tag/5.116.3-mod.2.6)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-blue.svg?style=flat-square)](https://github.com/KiryaScript/yamu-player)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-green.svg?style=flat-square)](https://nodejs.org)
