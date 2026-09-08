@@ -57,6 +57,11 @@ function initMod(mainWindow) {
           mainWindow.webContents.send('mod:toggle-panel');
           event.preventDefault();
         }
+        // Ctrl+D for Quick Download of current track
+        if (input.control && input.key.toLowerCase() === 'd') {
+          mainWindow.webContents.send('mod:quick-download');
+          event.preventDefault();
+        }
       }
     });
 
@@ -145,14 +150,31 @@ function initMod(mainWindow) {
     });
   });
 
-  // 6. IPC Handlers: Library Backup & Restore (Мне нравится)
+  // 6. IPC Handlers: Library Backup, Playlist Export & Transfer
   electron.ipcMain.handle('mod:export-backup', async (event, format = 'json', clientTracks = []) => {
     return await libraryBackup.exportBackup(format, clientTracks);
   });
 
-  electron.ipcMain.handle('mod:restore-backup', async (event) => {
+  electron.ipcMain.handle('mod:export-playlist', async (event, playlistData, format = 'json') => {
+    return await libraryBackup.exportPlaylist(playlistData, format);
+  });
+
+  electron.ipcMain.handle('mod:restore-backup', async (event, options = {}) => {
     const sender = event.sender;
-    return await libraryBackup.importAndRestore(sender);
+    return await libraryBackup.importAndRestore(sender, options);
+  });
+
+  electron.ipcMain.handle('mod:get-user-playlists', async () => {
+    return await libraryBackup.getUserPlaylists();
+  });
+
+  electron.ipcMain.handle('mod:create-playlist', async (event, title) => {
+    const cookieHeader = await libraryBackup.getSessionCookieHeader();
+    return await libraryBackup.createPlaylist(title, cookieHeader);
+  });
+
+  electron.ipcMain.handle('mod:get-current-user', async () => {
+    return await libraryBackup.getCurrentUser();
   });
 
   electron.ipcMain.handle('mod:get-backup-count', async () => {

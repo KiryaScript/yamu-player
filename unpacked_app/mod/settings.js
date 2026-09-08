@@ -20,6 +20,7 @@ const defaultSettings = {
   embedTags: true,
   createArtistFolder: false,
   createAlbumFolder: true,
+  showTrackListButtons: false,
   
   // Discord Rich Presence
   discordRpcEnabled: true,
@@ -34,7 +35,8 @@ const defaultSettings = {
 const ALLOWED_SETTING_KEYS = new Set([
   'volumeBoostEnabled', 'volumeBoost', 'downloadPath', 'downloadQuality',
   'embedCover', 'embedTags', 'createArtistFolder', 'createAlbumFolder',
-  'discordRpcEnabled', 'preventAutoUpdate', 'enableDevTools', 'oledTheme', 'closeToTray'
+  'showTrackListButtons', 'discordRpcEnabled', 'preventAutoUpdate',
+  'enableDevTools', 'oledTheme', 'closeToTray'
 ]);
 
 class SettingsManager {

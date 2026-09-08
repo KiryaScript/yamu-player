@@ -4,7 +4,14 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 const crypto = require('crypto');
-const nodeId3 = require('node-id3');
+let nodeId3 = null;
+try {
+  nodeId3 = require('node-id3');
+} catch (e) {
+  try {
+    nodeId3 = require(path.join(__dirname, '../../../unpacked_app/node_modules/node-id3'));
+  } catch (e2) {}
+}
 const settingsManager = require('./settings');
 
 let electronSession = null;
@@ -13,7 +20,12 @@ try {
   electronSession = electron.session;
 } catch (e) {}
 
-const YANDEX_MUSIC_SALT = 'XGRprocessCdIxappkg';
+// Salts used by Yandex Music:
+// 1. Web client salt (used by yamusic-downloader-pro & web player)
+const YANDEX_WEB_SALT = 'XGRlBW9FXlekgbPrRHuSiA';
+// 2. Native client salt
+const YANDEX_APP_SALT = 'XGRprocessCdIxappkg';
+const YANDEX_MUSIC_SALT = YANDEX_WEB_SALT;
 const WINDOWS_RESERVED_NAMES = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$/i;
 
 function sanitizeFilename(name, maxLen = 60) {
@@ -51,9 +63,17 @@ class Downloader {
     }
     try {
       const cookies = await electronSession.defaultSession.cookies.get({ domain: 'yandex.ru' });
-      const netCookies = await electronSession.defaultSession.cookies.get({ domain: 'yandex.net' });
-      const allCookies = [...cookies, ...netCookies];
-      return allCookies.map(c => `${c.name}=${c.value}`).join('; ');
+      const importantNames = new Set([
+        'Session_id', 'sessionid2', 'yandexuid', 'uid', 'yandex_login', 
+        'L', 'mda2_beacon', 'my', 'device_id', 'yashr'
+      ]);
+      const unique = {};
+      cookies.forEach(c => {
+        if (c.name && c.value && (importantNames.has(c.name) || c.name.startsWith('Session_') || c.name.startsWith('yp'))) {
+          unique[c.name] = c.value;
+        }
+      });
+      return Object.entries(unique).map(([k, v]) => `${k}=${v}`).join('; ');
     } catch (e) {
       return '';
     }
@@ -81,9 +101,12 @@ class Downloader {
       const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'application/json',
-        'Cookie': cookieHeader,
         ...extraHeaders
       };
+      if (!extraHeaders.noCookie && cookieHeader) {
+        headers['Cookie'] = cookieHeader;
+      }
+      delete headers.noCookie;
 
       const req = client.get(url, { headers, timeout: 20000 }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
@@ -191,7 +214,7 @@ class Downloader {
     });
   }
 
-  calculateDirectUrl(xmlText) {
+  calculateDirectUrl(xmlText, codec = 'mp3', customSalt = null) {
     const hostMatch = xmlText.match(/<host>(.*?)<\/host>/);
     const pathMatch = xmlText.match(/<path>(.*?)<\/path>/);
     const tsMatch = xmlText.match(/<ts>(.*?)<\/ts>/);
@@ -205,56 +228,126 @@ class Downloader {
     const pathVal = pathMatch[1].trim();
     const ts = tsMatch[1].trim();
     const s = sMatch[1].trim();
+    const cleanPath = pathVal.startsWith('/') ? pathVal.substring(1) : pathVal;
 
-    const signString = YANDEX_MUSIC_SALT + pathVal.substring(1) + s;
+    const salt = customSalt || YANDEX_WEB_SALT;
+    const signString = salt + cleanPath + s;
     const hash = crypto.createHash('md5').update(signString).digest('hex');
 
-    return `https://${host}/get-mp3/${hash}/${ts}${pathVal}`;
+    const prefix = (codec === 'flac') ? 'get-flac' : 'get-mp3';
+    return `https://${host}/${prefix}/${hash}/${ts}${pathVal}`;
   }
 
   async searchTrack(title, artist = '') {
     try {
-      const query = `${artist} ${title}`.trim();
-      const url = `https://api.music.yandex.net/search?text=${encodeURIComponent(query)}&type=track&page=0`;
-      const data = await this.fetchJson(url);
-      const tracks = data?.result?.tracks?.results;
-      if (tracks && tracks.length > 0) {
-        return tracks[0];
+      const cleanArtist = (artist === 'Яндекс Музыка' || artist === 'Unknown Artist') ? '' : artist;
+      const query = `${cleanArtist} ${title}`.trim();
+      if (!query) return null;
+
+      // 1. Primary: Search query without cookies (public, reliable, prevents HTTP 400 header bloat)
+      for (const host of ['https://api.music.yandex.ru', 'https://api.music.yandex.net']) {
+        try {
+          const url = `${host}/search?text=${encodeURIComponent(query)}&type=track&page=0`;
+          const data = await this.fetchJson(url, { noCookie: true });
+          const tracks = data?.result?.tracks?.results;
+          if (tracks && tracks.length > 0) return tracks[0];
+        } catch (e) {}
       }
-    } catch (e) {}
+
+      // 2. Secondary: Search by title alone if combined query had artist
+      if (cleanArtist && title) {
+        for (const host of ['https://api.music.yandex.ru', 'https://api.music.yandex.net']) {
+          try {
+            const urlTitle = `${host}/search?text=${encodeURIComponent(title.trim())}&type=track&page=0`;
+            const dataT = await this.fetchJson(urlTitle, { noCookie: true });
+            const tracksT = dataT?.result?.tracks?.results;
+            if (tracksT && tracksT.length > 0) return tracksT[0];
+          } catch (e) {}
+        }
+      }
+
+      // 3. Tertiary: Fallback with session cookies
+      try {
+        const urlRu = `https://api.music.yandex.ru/search?text=${encodeURIComponent(query)}&type=track&page=0`;
+        const dataRu = await this.fetchJson(urlRu);
+        const tracksRu = dataRu?.result?.tracks?.results;
+        if (tracksRu && tracksRu.length > 0) return tracksRu[0];
+      } catch (errRu) {}
+    } catch (e) {
+      console.warn('[Downloader] searchTrack error:', e.message);
+    }
     return null;
   }
 
   async getTrackDownloadUrl(trackId, preferredQuality = 'mp3_320') {
-    const infoUrl = `https://api.music.yandex.net/tracks/${trackId}/download-info`;
-    const response = await this.fetchJson(infoUrl);
-    const sources = response?.result;
+    let response = null;
+    const extraHeaders = {
+      'Referer': 'https://music.yandex.ru/',
+      'Origin': 'https://music.yandex.ru'
+    };
 
+    // 1. Try with session cookies (api.music.yandex.ru first)
+    for (const host of ['https://api.music.yandex.ru', 'https://api.music.yandex.net']) {
+      try {
+        const infoUrl = `${host}/tracks/${trackId}/download-info`;
+        response = await this.fetchJson(infoUrl, extraHeaders);
+        if (response?.result?.length) break;
+      } catch (e) {}
+    }
+
+    // 2. If rejected or failed (e.g. 401 Unauthorized), retry WITHOUT cookies!
+    if (!response?.result?.length) {
+      for (const host of ['https://api.music.yandex.ru', 'https://api.music.yandex.net']) {
+        try {
+          const infoUrl = `${host}/tracks/${trackId}/download-info`;
+          response = await this.fetchJson(infoUrl, { ...extraHeaders, noCookie: true });
+          if (response?.result?.length) break;
+        } catch (e) {}
+      }
+    }
+
+    const sources = response?.result;
     if (!sources || !sources.length) {
       throw new Error(`Не удалось получить источники для трека ID ${trackId}`);
     }
 
     let chosenSource = null;
     if (preferredQuality === 'flac') {
-      chosenSource = sources.find(s => s.codec === 'flac');
+      chosenSource = sources.find(s => s.codec === 'flac' && !s.preview);
+    }
+    if (!chosenSource && (preferredQuality === 'flac' || preferredQuality === 'mp3_320')) {
+      chosenSource = sources.find(s => s.codec === 'mp3' && s.bitrateInKbps === 320 && !s.preview);
     }
     if (!chosenSource) {
-      chosenSource = sources.find(s => s.codec === 'mp3' && s.bitrateInKbps === 320);
+      chosenSource = sources.find(s => s.codec === 'mp3' && s.bitrateInKbps >= 192 && !s.preview);
     }
     if (!chosenSource) {
-      chosenSource = sources.find(s => s.codec === 'mp3' && s.bitrateInKbps >= 192);
+      // Fallback to any non-preview source
+      chosenSource = sources.find(s => !s.preview);
     }
     if (!chosenSource) {
+      // Last resort: any source
       chosenSource = sources[0];
     }
 
     if (chosenSource.direct && chosenSource.downloadInfoUrl) {
-      return { url: chosenSource.downloadInfoUrl, codec: chosenSource.codec, bitrate: chosenSource.bitrateInKbps };
+      return { 
+        url: chosenSource.downloadInfoUrl, 
+        fallbackUrl: null, 
+        codec: chosenSource.codec, 
+        bitrate: chosenSource.bitrateInKbps 
+      };
     }
 
     const xml = await this.fetchXml(chosenSource.downloadInfoUrl);
-    const directUrl = this.calculateDirectUrl(xml);
-    return { url: directUrl, codec: chosenSource.codec, bitrate: chosenSource.bitrateInKbps };
+    const directUrl = this.calculateDirectUrl(xml, chosenSource.codec, YANDEX_WEB_SALT);
+    const fallbackUrl = this.calculateDirectUrl(xml, chosenSource.codec, YANDEX_APP_SALT);
+    return { 
+      url: directUrl, 
+      fallbackUrl, 
+      codec: chosenSource.codec, 
+      bitrate: chosenSource.bitrateInKbps 
+    };
   }
 
   async getTrackMeta(trackId) {
@@ -276,17 +369,25 @@ class Downloader {
       await fsPromises.mkdir(destDir, { recursive: true });
     }
 
-    let trackId = trackObj.id || trackObj.trackId;
+    let trackId = trackObj.id || trackObj.trackId || trackObj.realId;
     let trackMeta = trackObj;
 
-    // Fallback: If track ID is missing, search via title and artist
+    // Check link for track ID
+    if (!trackId && trackObj.link) {
+      const match = String(trackObj.link).match(/\/track\/(\d+)/);
+      if (match) trackId = match[1];
+    }
+
+    // Fallback: If track ID is missing, search via title and artist in Yandex Music catalog
     if (!trackId && (trackObj.title || trackObj.name)) {
       const titleToSearch = trackObj.title || trackObj.name;
       const artistToSearch = (trackObj.artists || []).map(a => a.name || a).join(' ');
+      console.log(`[Downloader] Track ID missing for "${titleToSearch}", searching catalog...`);
       const searched = await this.searchTrack(titleToSearch, artistToSearch);
-      if (searched) {
+      if (searched && searched.id) {
         trackMeta = searched;
         trackId = searched.id;
+        console.log(`[Downloader] Successfully resolved track ID: ${trackId} for "${titleToSearch}"`);
       }
     }
 
@@ -294,9 +395,21 @@ class Downloader {
       throw new Error(`Не удалось определить ID трека "${trackObj.title || 'Неизвестный трек'}"`);
     }
 
-    if (!trackMeta.title || !trackMeta.artists || trackMeta.artists.length === 0) {
-      const fetched = await this.getTrackMeta(trackId);
-      if (fetched) trackMeta = fetched;
+    // Safety check: ensure metadata corresponds to the actual trackId
+    if (trackId) {
+      try {
+        const fetched = await this.getTrackMeta(trackId);
+        if (fetched && fetched.title) {
+          const t1 = (trackObj.title || '').toLowerCase().trim();
+          const t2 = (fetched.title || '').toLowerCase().trim();
+          if (t1 && t2 && !t1.includes(t2) && !t2.includes(t1)) {
+            console.warn(`[Downloader] Desync detected: provided title "${trackObj.title}" does not match track ${trackId} ("${fetched.title}"). Syncing metadata to downloaded track.`);
+            trackMeta = fetched;
+          } else if (!trackMeta.title || !trackMeta.artists || trackMeta.artists.length === 0) {
+            trackMeta = fetched;
+          }
+        }
+      } catch (e) {}
     }
 
     let title = trackMeta.title || 'Unknown Title';
@@ -320,7 +433,18 @@ class Downloader {
     const safeTitle = sanitizeFilename(title, 60);
     const prefix = discPrefix ? `${discPrefix} - ` : '';
 
-    const { url: directUrl, codec, bitrate } = await this.getTrackDownloadUrl(trackId, settings.downloadQuality);
+    let directUrl = trackObj.directUrl;
+    let fallbackUrl = null;
+    let codec = trackObj.codec || 'mp3';
+    let bitrate = trackObj.bitrate;
+
+    if (!directUrl) {
+      const urlInfo = await this.getTrackDownloadUrl(trackId, settings.downloadQuality);
+      directUrl = urlInfo.url;
+      fallbackUrl = urlInfo.fallbackUrl;
+      codec = urlInfo.codec;
+      bitrate = urlInfo.bitrate;
+    }
     const ext = codec === 'flac' ? 'flac' : 'mp3';
     const filename = `${prefix}${safeArtist} - ${safeTitle}.${ext}`;
     const filePath = path.join(destDir, filename);
@@ -329,16 +453,83 @@ class Downloader {
       throw new Error('Недопустимый путь сохранения файла');
     }
 
-    const audioBuffer = await new Promise((resolve, reject) => {
-      const parsed = new URL(directUrl);
+    let audioBuffer;
+    try {
+      audioBuffer = await this.downloadStreamWithProgress(directUrl, onProgress, trackId, title, artists);
+    } catch (err) {
+      if (fallbackUrl) {
+        console.warn(`[Downloader] Primary URL attempt failed (${err.message}), retrying with alternate salt...`);
+        audioBuffer = await this.downloadStreamWithProgress(fallbackUrl, onProgress, trackId, title, artists);
+      } else {
+        throw err;
+      }
+    }
+
+    await fsPromises.writeFile(filePath, audioBuffer);
+
+    if (settings.embedTags && ext === 'mp3') {
+      try {
+        const tags = {
+          title,
+          artist: artists,
+          album,
+          year: year ? String(year) : undefined,
+          trackNumber: trackNumber ? String(trackNumber) : undefined
+        };
+
+        if (settings.embedCover && coverUri) {
+          try {
+            const coverUrl = coverUri.startsWith('http')
+              ? coverUri.replace(/\d+x\d+$/, '1000x1000')
+              : `https://${coverUri.replace('%%', '1000x1000')}`;
+            const coverBuffer = await this.fetchBuffer(coverUrl);
+            tags.image = {
+              mime: 'image/jpeg',
+              type: { id: 3, name: 'front cover' },
+              description: 'Cover',
+              imageBuffer: coverBuffer
+            };
+          } catch (e) {}
+        }
+
+        if (nodeId3) {
+          nodeId3.write(tags, filePath);
+        }
+      } catch (err) {
+        console.error('[Downloader] Failed to write ID3 tags:', err);
+      }
+    }
+
+    return {
+      success: true,
+      trackId,
+      title,
+      artists,
+      album,
+      filePath,
+      filename,
+      codec,
+      bitrate
+    };
+  }
+
+  async downloadStreamWithProgress(url, onProgress, trackId, title, artists) {
+    return new Promise((resolve, reject) => {
+      const parsed = new URL(url);
       const client = parsed.protocol === 'https:' ? https : http;
-      const req = client.get(directUrl, { timeout: 60000 }, (res) => {
+      const req = client.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://music.yandex.ru/'
+        },
+        timeout: 60000
+      }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           return this.fetchBuffer(res.headers.location).then(resolve).catch(reject);
         }
 
         if (res.statusCode < 200 || res.statusCode >= 300) {
-          return reject(new Error(`Ошибка скачивания трека: HTTP ${res.statusCode}`));
+          return reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
         }
 
         const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
@@ -369,53 +560,15 @@ class Downloader {
 
       req.on('timeout', () => {
         req.destroy();
-        reject(new Error('Таймаут скачивания аудиопотока'));
+        reject(new Error('Превышено время скачивания аудиопотока'));
       });
       req.on('error', reject);
     });
+  }
 
-    await fsPromises.writeFile(filePath, audioBuffer);
-
-    if (settings.embedTags && ext === 'mp3') {
-      try {
-        const tags = {
-          title,
-          artist: artists,
-          album,
-          year: year ? String(year) : undefined,
-          trackNumber: trackNumber ? String(trackNumber) : undefined
-        };
-
-        if (settings.embedCover && coverUri) {
-          try {
-            const coverUrl = `https://${coverUri.replace('%%', '1000x1000')}`;
-            const coverBuffer = await this.fetchBuffer(coverUrl);
-            tags.image = {
-              mime: 'image/jpeg',
-              type: { id: 3, name: 'front cover' },
-              description: 'Cover',
-              imageBuffer: coverBuffer
-            };
-          } catch (e) {}
-        }
-
-        nodeId3.write(tags, filePath);
-      } catch (err) {
-        console.error('[Downloader] Failed to write ID3 tags:', err);
-      }
-    }
-
-    return {
-      success: true,
-      trackId,
-      title,
-      artists,
-      album,
-      filePath,
-      filename,
-      codec,
-      bitrate
-    };
+  // Alias for downloadSingleTrack
+  async downloadTrack(trackObj, targetFolder = null, onProgress = null, discPrefix = '') {
+    return await this.downloadSingleTrack(trackObj, targetFolder, onProgress, discPrefix);
   }
 
   async downloadAlbum(albumId, onProgress = null, onTrackDone = null) {
@@ -482,48 +635,73 @@ class Downloader {
     };
   }
 
-  async downloadPlaylist(userId, playlistKind, onProgress = null, onTrackDone = null) {
+  async downloadPlaylist(userIdOrParams, playlistKind = null, onProgress = null, onTrackDone = null) {
     const settings = settingsManager.getAll();
-    let playlistUrl;
-    let isLikes = (playlistKind === 'likes' || playlistKind === '3' || userId === 'likes' || !playlistKind);
+    let userId = null;
+    let kind = null;
+    let customTitle = null;
+    let preloadedTracks = null;
 
-    if (isLikes) {
-      // Likes playlist for current user
-      const actualUid = await this.getUserId() || userId || '3';
-      playlistUrl = `https://api.music.yandex.net/users/${actualUid}/playlists/3`;
-    } else if (playlistKind) {
-      playlistUrl = `https://api.music.yandex.net/users/${userId}/playlists/${playlistKind}`;
-    } else {
-      playlistUrl = `https://api.music.yandex.net/playlists/${userId}`;
-    }
-
-    let data;
-    try {
-      data = await this.fetchJson(playlistUrl);
-    } catch (err) {
-      // If direct playlist endpoint failed, fallback to likes/tracks
-      if (isLikes) {
-        const actualUid = await this.getUserId() || '3';
-        data = await this.fetchJson(`https://api.music.yandex.net/users/${actualUid}/likes/tracks`);
-      } else {
-        throw err;
+    if (typeof userIdOrParams === 'object' && userIdOrParams !== null) {
+      userId = userIdOrParams.userId;
+      kind = userIdOrParams.playlistKind || userIdOrParams.kind;
+      customTitle = userIdOrParams.title || userIdOrParams.playlistTitle;
+      preloadedTracks = userIdOrParams.tracks;
+      if (typeof playlistKind === 'function') {
+        onProgress = playlistKind;
+        playlistKind = null;
       }
+    } else {
+      userId = userIdOrParams;
+      kind = playlistKind;
     }
 
-    const playlist = data?.result;
-    if (!playlist) {
-      throw new Error(`Плейлист не найден`);
+    let allTracks = [];
+    let playlistTitle = customTitle || 'Плейлист';
+
+    if (Array.isArray(preloadedTracks) && preloadedTracks.length > 0) {
+      allTracks = preloadedTracks;
+    } else {
+      let isLikes = (kind === 'likes' || kind === '3' || userId === 'likes' || !kind);
+      let playlistUrl;
+
+      if (isLikes) {
+        const actualUid = await this.getUserId() || userId || '3';
+        playlistUrl = `https://api.music.yandex.net/users/${actualUid}/playlists/3`;
+      } else if (kind) {
+        playlistUrl = `https://api.music.yandex.net/users/${userId}/playlists/${kind}`;
+      } else {
+        playlistUrl = `https://api.music.yandex.net/playlists/${userId}`;
+      }
+
+      let data;
+      try {
+        data = await this.fetchJson(playlistUrl);
+      } catch (err) {
+        if (isLikes) {
+          const actualUid = await this.getUserId() || '3';
+          data = await this.fetchJson(`https://api.music.yandex.net/users/${actualUid}/likes/tracks`);
+        } else {
+          throw err;
+        }
+      }
+
+      const playlist = data?.result;
+      if (!playlist) {
+        throw new Error('Плейлист не найден');
+      }
+
+      playlistTitle = playlist.title || playlistTitle || 'Мне нравится';
+      const rawTracks = playlist.tracks || playlist.library?.tracks || [];
+      allTracks = rawTracks.map(t => t.track || t).filter(Boolean);
     }
 
-    const playlistTitle = sanitizeFilename(playlist.title || 'Мне нравится', 50);
-    const playlistDir = path.join(settings.downloadPath, playlistTitle);
+    const safePlaylistTitle = sanitizeFilename(playlistTitle, 50);
+    const playlistDir = path.join(settings.downloadPath, safePlaylistTitle);
 
     if (!fs.existsSync(playlistDir)) {
       await fsPromises.mkdir(playlistDir, { recursive: true });
     }
-
-    const rawTracks = playlist.tracks || playlist.library?.tracks || [];
-    const allTracks = rawTracks.map(t => t.track || t).filter(Boolean);
 
     const results = [];
     for (let i = 0; i < allTracks.length; i++) {
@@ -533,7 +711,7 @@ class Downloader {
         const res = await this.downloadSingleTrack(track, playlistDir, (p) => {
           if (onProgress) {
             onProgress({
-              playlistTitle,
+              playlistTitle: safePlaylistTitle,
               currentTrackIndex: i + 1,
               totalTracks: allTracks.length,
               ...p
@@ -549,7 +727,7 @@ class Downloader {
 
     return {
       success: true,
-      playlistTitle,
+      playlistTitle: safePlaylistTitle,
       folderPath: playlistDir,
       downloadedCount: results.length,
       totalCount: allTracks.length
@@ -557,6 +735,9 @@ class Downloader {
   }
 }
 
-module.exports = new Downloader();
+const downloaderInstance = new Downloader();
+module.exports = downloaderInstance;
 module.exports.sanitizeFilename = sanitizeFilename;
 module.exports.isPathInside = isPathInside;
+module.exports.YANDEX_WEB_SALT = YANDEX_WEB_SALT;
+module.exports.YANDEX_APP_SALT = YANDEX_APP_SALT;
