@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Yandex Music Desktop Patcher
 # ==============================================================================
 
@@ -9,10 +9,9 @@ function Show-Banner {
     Clear-Host
     Write-Host "==============================================================================" -ForegroundColor DarkCyan
     Write-Host "             МОДИФИКАТОР ОРИГИНАЛЬНОЙ ЯНДЕКС МУЗЫКИ (DESKTOP)                 " -ForegroundColor Cyan
-    Write-Host "==============================================================================" -ForegroundColor DarkCyan
     Write-Host " [★] AMOLED Тема (#000000)          [★] Discord Rich Presence" -ForegroundColor Yellow
-    Write-Host " [★] Скачивание треков в 320 kbps   [★] Пакетное скачивание плейлистов" -ForegroundColor Yellow
-    Write-Host " [★] Экспорт/Импорт медиатеки       [★] Smart Cache (Предзагрузчик)" -ForegroundColor Yellow
+    Write-Host " [★] Скачивание (FLAC / 320 kbps)   [★] Быстрое скачивание (Ctrl + D)" -ForegroundColor Yellow
+    Write-Host " [★] Перенос музыки (пачками по 50) [★] Экспорт списков (TXT, CSV, M3U8)" -ForegroundColor Yellow
     Write-Host " [★] Zero Telemetry (Анти-бан)      [★] Отключение рекламы и ограничений" -ForegroundColor Yellow
     Write-Host "==============================================================================" -ForegroundColor DarkCyan
     Write-Host ""

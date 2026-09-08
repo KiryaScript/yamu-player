@@ -22,25 +22,51 @@ const asarHeaderHash = crypto.createHash('sha256').update(headerBuf).digest('hex
 
 console.log('2. Computed ASAR Header SHA-256 Hash:', asarHeaderHash);
 
-// 3. Patch the hash inside the executable
-console.log('3. Patching integrity hash inside Яндекс Музыка.exe...');
-const exeBuf = fs.readFileSync(exePath);
+// 3. Target locations to update & patch
+const targetDirs = [
+  appSourceDir,
+  path.join(process.env.LOCALAPPDATA || 'C:\\Users\\rdk30\\AppData\\Local', 'Programs', 'YandexMusic')
+];
 
-const integrityTag = Buffer.from('resources\\\\app.asar","alg":"SHA256","value":"');
-const tagIdx = exeBuf.indexOf(integrityTag);
+targetDirs.forEach(dir => {
+  if (!fs.existsSync(dir)) return;
+  const targetAsar = path.join(dir, 'resources', 'app.asar');
+  if (targetAsar !== asarPath) {
+    console.log(`Copying app.asar to ${targetAsar}...`);
+    try {
+      fs.copyFileSync(asarPath, targetAsar);
+    } catch (e) {
+      console.warn(`Could not copy to ${targetAsar}:`, e.message);
+    }
+  }
 
-if (tagIdx === -1) {
-  console.error('ERROR: Could not find integrity JSON tag in executable!');
-  process.exit(1);
+  const targetExes = ['Яндекс Музыка.exe', 'YandexMusic.exe'];
+  targetExes.forEach(exeName => {
+    const currentExePath = path.join(dir, exeName);
+    if (!fs.existsSync(currentExePath)) return;
+    console.log(`3. Patching integrity hash inside ${path.join(dir, exeName)}...`);
+    const exeBuf = fs.readFileSync(currentExePath);
+    const integrityTag = Buffer.from('resources\\\\app.asar","alg":"SHA256","value":"');
+    const tagIdx = exeBuf.indexOf(integrityTag);
+    if (tagIdx === -1) {
+      console.warn(`   Notice: Could not find integrity JSON tag in ${exeName}, skipping.`);
+      return;
+    }
+    const hashStart = tagIdx + integrityTag.length;
+    const currentHashInExe = exeBuf.slice(hashStart, hashStart + 64).toString('utf8');
+    console.log(`   Previous hash in ${exeName}:`, currentHashInExe);
+    console.log(`   Writing new header hash:`, asarHeaderHash);
+    exeBuf.write(asarHeaderHash, hashStart, 64, 'utf8');
+    fs.writeFileSync(currentExePath, exeBuf);
+    console.log(`4. Successfully patched ${exeName}!`);
+  });
+});
+
+// Also update Desktop Patcher data archive if present
+const patcherDataAsar = 'D:\\Desktop\\yandex\\Yandex_Music_Desktop_Patcher\\data\\app.asar';
+if (fs.existsSync(path.dirname(patcherDataAsar))) {
+  console.log(`Updating ${patcherDataAsar}...`);
+  fs.copyFileSync(asarPath, patcherDataAsar);
 }
-
-const hashStart = tagIdx + integrityTag.length;
-const currentHashInExe = exeBuf.slice(hashStart, hashStart + 64).toString('utf8');
-console.log('   Previous hash in exe:', currentHashInExe);
-console.log('   Writing new header hash:', asarHeaderHash);
-
-exeBuf.write(asarHeaderHash, hashStart, 64, 'utf8');
-fs.writeFileSync(exePath, exeBuf);
-console.log('4. Successfully patched executable integrity signature!');
 
 console.log('=== BUILD & PATCH COMPLETED SUCCESSFULLY ===');

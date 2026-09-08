@@ -249,7 +249,11 @@ electron.contextBridge.exposeInMainWorld("yandexMod", {
   downloadAlbum: (albumId) => electron.ipcRenderer.invoke('mod:download-album', albumId),
   downloadPlaylist: (playlistData) => electron.ipcRenderer.invoke('mod:download-playlist', playlistData),
   exportBackup: (format, clientTracks) => electron.ipcRenderer.invoke('mod:export-backup', format, clientTracks),
-  restoreBackup: () => electron.ipcRenderer.invoke('mod:restore-backup'),
+  exportPlaylist: (playlistData, format) => electron.ipcRenderer.invoke('mod:export-playlist', playlistData, format),
+  getUserPlaylists: () => electron.ipcRenderer.invoke('mod:get-user-playlists'),
+  createPlaylist: (title) => electron.ipcRenderer.invoke('mod:create-playlist', title),
+  getCurrentUser: () => electron.ipcRenderer.invoke('mod:get-current-user'),
+  restoreBackup: (options) => electron.ipcRenderer.invoke('mod:restore-backup', options),
   getBackupCount: () => electron.ipcRenderer.invoke('mod:get-backup-count'),
   toggleDevTools: () => electron.ipcRenderer.invoke('mod:toggle-devtools'),
   updatePlayerState: (state) => electron.ipcRenderer.send('mod:update-player-state', state),
@@ -258,6 +262,11 @@ electron.contextBridge.exposeInMainWorld("yandexMod", {
     const handler = () => cb();
     electron.ipcRenderer.on('mod:toggle-panel', handler);
     return () => electron.ipcRenderer.removeListener('mod:toggle-panel', handler);
+  },
+  onQuickDownload: (cb) => {
+    const handler = () => cb();
+    electron.ipcRenderer.on('mod:quick-download', handler);
+    return () => electron.ipcRenderer.removeListener('mod:quick-download', handler);
   },
   onDownloadProgress: (cb) => {
     const handler = (_, p) => cb(p);
