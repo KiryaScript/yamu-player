@@ -59,19 +59,22 @@ try {
 class Downloader {
   constructor() {
     this.queue = [];
-    this.activeDownloads = new Map();
+    this.activeRequests = new Set();
     this.isCancelled = false;
   }
 
   cancelDownload() {
     this.isCancelled = true;
-    for (const [id, req] of this.activeDownloads.entries()) {
+    console.log(`[Downloader] cancelDownload requested. Aborting ${this.activeRequests.size} active download streams...`);
+    for (const req of this.activeRequests) {
       try {
-        if (typeof req.destroy === 'function') req.destroy();
+        if (req && typeof req.destroy === 'function') {
+          req.destroy(new Error('DOWNLOAD_CANCELLED'));
+        }
       } catch (e) {}
     }
-    this.activeDownloads.clear();
-    console.log('[Downloader] Active downloads cancelled.');
+    this.activeRequests.clear();
+    console.log('[Downloader] All active download streams aborted.');
   }
 
   async getSessionCookieHeader() {
@@ -383,12 +386,14 @@ class Downloader {
   }
 
   async downloadSingleTrack(trackObj, targetFolder = null, onProgress = null, discPrefix = '') {
+    if (this.isCancelled) return { success: false, cancelled: true };
     const settings = settingsManager.getAll();
     const destDir = targetFolder || settings.downloadPath;
 
     if (!fs.existsSync(destDir)) {
       await fsPromises.mkdir(destDir, { recursive: true });
     }
+    if (this.isCancelled) return { success: false, cancelled: true };
 
     let trackId = trackObj.id || trackObj.trackId || trackObj.realId;
     let trackMeta = trackObj;
@@ -416,6 +421,8 @@ class Downloader {
       throw new Error(`Не удалось определить ID трека "${trackObj.title || 'Неизвестный трек'}"`);
     }
 
+    if (this.isCancelled) return { success: false, cancelled: true };
+
     // Safety check: ensure metadata corresponds to the actual trackId
     if (trackId) {
       try {
@@ -432,6 +439,8 @@ class Downloader {
         }
       } catch (e) {}
     }
+
+    if (this.isCancelled) return { success: false, cancelled: true };
 
     let title = trackMeta.title || 'Unknown Title';
     if (trackMeta.version) {
@@ -466,6 +475,9 @@ class Downloader {
       codec = urlInfo.codec;
       bitrate = urlInfo.bitrate;
     }
+
+    if (this.isCancelled) return { success: false, cancelled: true };
+
     const ext = codec === 'flac' ? 'flac' : 'mp3';
     const filename = `${prefix}${safeArtist} - ${safeTitle}.${ext}`;
     const filePath = path.join(destDir, filename);
@@ -499,10 +511,15 @@ class Downloader {
       } catch (e) {}
     }
 
+    if (this.isCancelled) return { success: false, cancelled: true };
+
     let audioBuffer;
     try {
       audioBuffer = await this.downloadStreamWithProgress(directUrl, onProgress, trackId, title, artists);
     } catch (err) {
+      if (this.isCancelled || err.message === 'DOWNLOAD_CANCELLED') {
+        return { success: false, cancelled: true };
+      }
       if (fallbackUrl) {
         console.warn(`[Downloader] Primary URL attempt failed (${err.message}), retrying with alternate salt...`);
         audioBuffer = await this.downloadStreamWithProgress(fallbackUrl, onProgress, trackId, title, artists);
@@ -511,7 +528,11 @@ class Downloader {
       }
     }
 
+    if (this.isCancelled) return { success: false, cancelled: true };
+
     await fsPromises.writeFile(filePath, audioBuffer);
+
+    if (this.isCancelled) return { success: false, cancelled: true };
 
     if (settings.embedTags && ext === 'mp3') {
       try {
@@ -560,9 +581,15 @@ class Downloader {
   }
 
   async downloadStreamWithProgress(url, onProgress, trackId, title, artists) {
+    if (this.isCancelled) {
+      throw new Error('DOWNLOAD_CANCELLED');
+    }
+
     return new Promise((resolve, reject) => {
       const parsed = new URL(url);
       const client = parsed.protocol === 'https:' ? https : http;
+      let isReqAborted = false;
+
       const req = client.get(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -570,6 +597,11 @@ class Downloader {
         },
         timeout: 60000
       }, (res) => {
+        if (this.isCancelled || isReqAborted) {
+          req.destroy();
+          return reject(new Error('DOWNLOAD_CANCELLED'));
+        }
+
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           return this.fetchBuffer(res.headers.location).then(resolve).catch(reject);
         }
@@ -583,6 +615,10 @@ class Downloader {
         const chunks = [];
 
         res.on('data', (chunk) => {
+          if (this.isCancelled || isReqAborted) {
+            req.destroy();
+            return reject(new Error('DOWNLOAD_CANCELLED'));
+          }
           chunks.push(chunk);
           downloadedBytes += chunk.length;
           if (onProgress && totalBytes > 0) {
@@ -599,16 +635,37 @@ class Downloader {
         });
 
         res.on('end', () => {
+          if (this.isCancelled || isReqAborted) {
+            return reject(new Error('DOWNLOAD_CANCELLED'));
+          }
           resolve(Buffer.concat(chunks));
         });
-        res.on('error', reject);
+        res.on('error', (err) => {
+          if (this.isCancelled || isReqAborted) {
+            reject(new Error('DOWNLOAD_CANCELLED'));
+          } else {
+            reject(err);
+          }
+        });
       });
+
+      this.activeRequests.add(req);
+      const cleanup = () => this.activeRequests.delete(req);
+      req.on('close', cleanup);
+      req.on('error', cleanup);
 
       req.on('timeout', () => {
         req.destroy();
         reject(new Error('Превышено время скачивания аудиопотока'));
       });
-      req.on('error', reject);
+      req.on('error', (err) => {
+        cleanup();
+        if (this.isCancelled || isReqAborted) {
+          reject(new Error('DOWNLOAD_CANCELLED'));
+        } else {
+          reject(err);
+        }
+      });
     });
   }
 
@@ -656,6 +713,32 @@ class Downloader {
     let completedCount = 0;
     let skippedCount = 0;
     let activeTrackIndex = 0;
+    const activeTracks = new Map();
+
+    let lastProgressEmit = 0;
+    const emitBatchProgress = (force = false) => {
+      if (this.isCancelled) return;
+      const now = Date.now();
+      if (!force && now - lastProgressEmit < 250) return;
+      lastProgressEmit = now;
+
+      if (onProgress) {
+        const currentTitles = Array.from(activeTracks.values()).filter(Boolean);
+        onProgress({
+          albumTitle,
+          artistName,
+          completedTracks: completedCount,
+          currentTrackIndex: Math.min(completedCount + 1, allTracksWithMeta.length),
+          totalTracks: allTracksWithMeta.length,
+          downloadedCount: results.length - skippedCount,
+          skippedCount,
+          percent: Math.min(100, Math.round((completedCount / allTracksWithMeta.length) * 100)),
+          activeWorkers: currentTitles.length,
+          currentTracks: currentTitles,
+          trackTitle: currentTitles[0] || ''
+        });
+      }
+    };
 
     const worker = async (workerId) => {
       if (workerId > 0) {
@@ -663,39 +746,52 @@ class Downloader {
       }
 
       while (activeTrackIndex < allTracksWithMeta.length) {
-        if (this.isCancelled) break;
+        if (this.isCancelled) {
+          activeTracks.delete(workerId);
+          break;
+        }
 
         const currentIndex = activeTrackIndex++;
-        if (currentIndex >= allTracksWithMeta.length) break;
+        if (currentIndex >= allTracksWithMeta.length) {
+          activeTracks.delete(workerId);
+          break;
+        }
 
         const item = allTracksWithMeta[currentIndex];
+        const trackTitle = item.track?.title || item.track?.name || `Трек #${currentIndex + 1}`;
+        activeTracks.set(workerId, trackTitle);
+        emitBatchProgress();
+
         try {
-          const res = await this.downloadSingleTrack(item.track, albumDir, (p) => {
-            if (onProgress) {
-              onProgress({
-                albumTitle,
-                currentTrackIndex: completedCount + 1,
-                totalTracks: allTracksWithMeta.length,
-                downloadedCount: results.length - skippedCount,
-                skippedCount,
-                trackTitle: item.track?.title || item.track?.name || '',
-                ...p
-              });
-            }
+          const res = await this.downloadSingleTrack(item.track, albumDir, () => {
+            emitBatchProgress();
           }, item.prefix);
+
+          activeTracks.delete(workerId);
+          if (this.isCancelled || res?.cancelled) {
+            break;
+          }
 
           if (res?.skipped) skippedCount++;
           results.push(res);
           completedCount++;
+          emitBatchProgress(true);
           if (onTrackDone) onTrackDone(res, completedCount, allTracksWithMeta.length);
         } catch (err) {
+          activeTracks.delete(workerId);
+          if (this.isCancelled || err.message === 'DOWNLOAD_CANCELLED') {
+            break;
+          }
           completedCount++;
+          emitBatchProgress(true);
           console.error(`[Downloader] Error downloading album track #${currentIndex + 1}:`, err.message);
         }
 
+        if (this.isCancelled) break;
         const jitter = 50 + Math.floor(Math.random() * 100);
         await new Promise(r => setTimeout(r, jitter));
       }
+      activeTracks.delete(workerId);
     };
 
     const workers = [];
@@ -703,6 +799,16 @@ class Downloader {
       workers.push(worker(i));
     }
     await Promise.all(workers);
+
+    if (this.isCancelled && onProgress) {
+      onProgress({
+        cancelled: true,
+        status: 'cancelled',
+        albumTitle,
+        completedTracks: completedCount,
+        totalTracks: allTracksWithMeta.length
+      });
+    }
 
     return {
       success: !this.isCancelled,
@@ -832,6 +938,31 @@ class Downloader {
     let completedCount = 0;
     let skippedCount = 0;
     let activeTrackIndex = 0;
+    const activeTracks = new Map();
+
+    let lastProgressEmit = 0;
+    const emitBatchProgress = (force = false) => {
+      if (this.isCancelled) return;
+      const now = Date.now();
+      if (!force && now - lastProgressEmit < 250) return;
+      lastProgressEmit = now;
+
+      if (onProgress) {
+        const currentTitles = Array.from(activeTracks.values()).filter(Boolean);
+        onProgress({
+          playlistTitle: safePlaylistTitle,
+          completedTracks: completedCount,
+          currentTrackIndex: Math.min(completedCount + 1, allTracks.length),
+          totalTracks: allTracks.length,
+          downloadedCount: results.length - skippedCount,
+          skippedCount,
+          percent: Math.min(100, Math.round((completedCount / allTracks.length) * 100)),
+          activeWorkers: currentTitles.length,
+          currentTracks: currentTitles,
+          trackTitle: currentTitles[0] || ''
+        });
+      }
+    };
 
     const worker = async (workerId) => {
       if (workerId > 0) {
@@ -840,44 +971,54 @@ class Downloader {
 
       while (activeTrackIndex < allTracks.length) {
         if (this.isCancelled) {
+          activeTracks.delete(workerId);
           console.log(`[Downloader] Worker #${workerId + 1} stopped due to cancellation.`);
           break;
         }
 
         const currentIndex = activeTrackIndex++;
-        if (currentIndex >= allTracks.length) break;
+        if (currentIndex >= allTracks.length) {
+          activeTracks.delete(workerId);
+          break;
+        }
 
         const rawTrack = allTracks[currentIndex];
         const track = rawTrack.track || rawTrack;
         const trackNum = String(currentIndex + 1).padStart(3, '0');
+        const trackTitle = track.title || track.name || `Трек #${currentIndex + 1}`;
+        activeTracks.set(workerId, trackTitle);
+        emitBatchProgress();
 
         try {
-          const res = await this.downloadSingleTrack(track, playlistDir, (p) => {
-            if (onProgress) {
-              onProgress({
-                playlistTitle: safePlaylistTitle,
-                currentTrackIndex: completedCount + 1,
-                totalTracks: allTracks.length,
-                downloadedCount: results.length - skippedCount,
-                skippedCount,
-                trackTitle: track.title || track.name || '',
-                ...p
-              });
-            }
+          const res = await this.downloadSingleTrack(track, playlistDir, () => {
+            emitBatchProgress();
           }, trackNum);
+
+          activeTracks.delete(workerId);
+          if (this.isCancelled || res?.cancelled) {
+            break;
+          }
 
           if (res?.skipped) skippedCount++;
           results.push(res);
           completedCount++;
+          emitBatchProgress(true);
           if (onTrackDone) onTrackDone(res, completedCount, allTracks.length);
         } catch (err) {
+          activeTracks.delete(workerId);
+          if (this.isCancelled || err.message === 'DOWNLOAD_CANCELLED') {
+            break;
+          }
           completedCount++;
+          emitBatchProgress(true);
           console.error(`[Downloader] Error downloading playlist track #${currentIndex + 1}:`, err.message);
         }
 
+        if (this.isCancelled) break;
         const jitter = 50 + Math.floor(Math.random() * 100);
         await new Promise(r => setTimeout(r, jitter));
       }
+      activeTracks.delete(workerId);
     };
 
     const workers = [];
@@ -885,6 +1026,16 @@ class Downloader {
       workers.push(worker(i));
     }
     await Promise.all(workers);
+
+    if (this.isCancelled && onProgress) {
+      onProgress({
+        cancelled: true,
+        status: 'cancelled',
+        playlistTitle: safePlaylistTitle,
+        completedTracks: completedCount,
+        totalTracks: allTracks.length
+      });
+    }
 
     return {
       success: !this.isCancelled,

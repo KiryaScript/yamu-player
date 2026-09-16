@@ -12,6 +12,7 @@
   const safeFetch = (url, opts) => (origFetch ? origFetch(url, opts) : fetch(url, opts));
   const _recentTrackHistory = [];
   const _trackMetaCache = {};
+  let isDownloadCancelled = false;
 
   function recordTrackId(id) {
     if (!id) return;
@@ -1419,6 +1420,7 @@ ${updateInfo.changelog}
 
     const artistName = track.artists?.[0]?.name || 'Яндекс Музыка';
     const prefix = source === 'quick' ? 'Быстрое скачивание (Ctrl+D)' : 'Начало скачивания';
+    isDownloadCancelled = false;
     showToast(`${prefix}: ${artistName} — ${track.title}...`, 'info');
     try {
       const res = await window.yandexMod.downloadTrack(track);
@@ -1505,21 +1507,28 @@ ${updateInfo.changelog}
       dlBtn.innerHTML = `⬇️ <span>Скачать альбом</span>`;
       dlBtn.onclick = async () => {
         try {
+          isDownloadCancelled = false;
           showToast('Загрузка списка треков альбома...', 'info', 3500);
           const res = await window.yandexMod.downloadAlbum(entity.id);
+          if (isDownloadCancelled || res?.cancelled) {
+            return;
+          }
           if (res && res.success) {
             showToast(`✅ Альбом "${res.albumTitle}" скачан (${res.downloadedCount}/${res.totalCount} треков)!`, 'success', 6000);
           } else {
             showToast(`Ошибка скачивания: ${res?.error || 'Не удалось скачать альбом'}`, 'error', 6000);
           }
         } catch (err) {
-          showToast(`Ошибка скачивания: ${err.message || err}`, 'error', 6000);
+          if (!isDownloadCancelled) {
+            showToast(`Ошибка скачивания: ${err.message || err}`, 'error', 6000);
+          }
         }
       };
     } else {
       dlBtn.innerHTML = `⬇️ <span>Скачать плейлист</span>`;
       dlBtn.onclick = async () => {
         try {
+          isDownloadCancelled = false;
           showToast('Подготовка списка треков к скачиванию...', 'info', 4000);
           
           let preloadedTracks = null;
@@ -1535,13 +1544,19 @@ ${updateInfo.changelog}
             tracks: (preloadedTracks && preloadedTracks.length > 0) ? preloadedTracks : undefined
           });
 
+          if (isDownloadCancelled || res?.cancelled) {
+            return;
+          }
+
           if (res && res.success) {
             showToast(`✅ Плейлист "${res.playlistTitle}" скачан (${res.downloadedCount}/${res.totalCount} треков)!`, 'success', 6000);
           } else {
             showToast(`Ошибка скачивания: ${res?.error || 'Не удалось скачать плейлист'}`, 'error', 6000);
           }
         } catch (err) {
-          showToast(`Ошибка скачивания: ${err.message || err}`, 'error', 6000);
+          if (!isDownloadCancelled) {
+            showToast(`Ошибка скачивания: ${err.message || err}`, 'error', 6000);
+          }
         }
       };
     }
@@ -2111,45 +2126,80 @@ ${updateInfo.changelog}
       window.yandexMod.onDownloadProgress((p) => {
         if (!p) return;
         
+        if (isDownloadCancelled || p.cancelled || p.status === 'cancelled') {
+          if (activeProgressToast) {
+            activeProgressToast.remove();
+            activeProgressToast = null;
+          }
+          return;
+        }
+
+        const isBatch = Boolean(p.totalTracks && p.totalTracks > 1);
         const title = p.playlistTitle || p.albumTitle || '';
-        const indexStr = (p.totalTracks && p.totalTracks > 1) ? `[${p.currentTrackIndex || 1}/${p.totalTracks}] ` : '';
-        const trackName = p.trackTitle || p.filename || '';
-        const percentStr = (typeof p.percent === 'number' && p.percent >= 0) ? ` (${p.percent}%)` : '';
-        const msg = `📥 ${indexStr}${title ? title + ': ' : ''}${trackName}${percentStr}`;
+        let mainText = '';
+        let subText = '';
+
+        if (isBatch) {
+          const completed = typeof p.completedTracks === 'number' ? p.completedTracks : ((p.currentTrackIndex || 1) - 1);
+          const total = p.totalTracks;
+          const pct = typeof p.percent === 'number' ? ` (${p.percent}%)` : '';
+          const workers = p.activeWorkers || settings.downloadConcurrency || 3;
+          const workersLabel = `${workers} ${workers === 1 ? 'поток' : (workers < 5 ? 'потока' : 'потоков')}`;
+          
+          mainText = `📥 ${title ? title + ': ' : ''}${completed}/${total} треков${pct} • ${workersLabel}`;
+          if (p.currentTracks && p.currentTracks.length > 0) {
+            subText = p.currentTracks.slice(0, 3).join(' • ');
+          } else if (p.trackTitle) {
+            subText = p.trackTitle;
+          }
+        } else {
+          const trackName = p.trackTitle || p.filename || '';
+          const percentStr = (typeof p.percent === 'number' && p.percent >= 0) ? ` (${p.percent}%)` : '';
+          mainText = `📥 ${trackName}${percentStr}`;
+        }
 
         if (!activeProgressToast || !activeProgressToast.parentElement) {
-          activeProgressToast = showToast(msg, 'info', 30000);
-          if (activeProgressToast && (p.totalTracks > 1 || p.playlistTitle || p.albumTitle)) {
+          activeProgressToast = showToast(mainText, 'info', 60000);
+          if (activeProgressToast && isBatch) {
             const stopBtn = document.createElement('button');
             stopBtn.className = 'ym-stop-download-btn';
             stopBtn.textContent = '⏹️ Стоп';
-            stopBtn.style.cssText = 'background: rgba(239, 68, 68, 0.25); border: 1px solid #ef4444; color: #fca5a5; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 8px; white-space: nowrap; flex-shrink: 0;';
+            stopBtn.style.cssText = 'background: rgba(239, 68, 68, 0.25); border: 1px solid #ef4444; color: #fca5a5; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 10px; white-space: nowrap; flex-shrink: 0;';
             stopBtn.onclick = (e) => {
               e.stopPropagation();
+              isDownloadCancelled = true;
               if (window.yandexMod && window.yandexMod.cancelDownload) {
                 window.yandexMod.cancelDownload();
-                showToast('🛑 Остановка скачивания...', 'info', 3000);
               }
               if (activeProgressToast) {
                 activeProgressToast.remove();
                 activeProgressToast = null;
               }
+              showToast('🛑 Скачивание остановлено', 'info', 4000);
             };
             activeProgressToast.appendChild(stopBtn);
           }
-        } else {
+        }
+
+        if (activeProgressToast) {
           const textEl = activeProgressToast.querySelector('div:nth-child(2)');
-          if (textEl) textEl.textContent = msg;
+          if (textEl) {
+            if (subText) {
+              textEl.innerHTML = `<div style="font-weight: 600;">${mainText}</div><div style="font-size: 11px; color: #aaa; margin-top: 2px; max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${subText}</div>`;
+            } else {
+              textEl.textContent = mainText;
+            }
+          }
         }
 
         clearTimeout(hideProgressTimeout);
-        if (p.totalTracks && p.currentTrackIndex === p.totalTracks && p.percent === 100) {
+        if (p.totalTracks && p.completedTracks === p.totalTracks) {
           hideProgressTimeout = setTimeout(() => {
             if (activeProgressToast) {
               activeProgressToast.remove();
               activeProgressToast = null;
             }
-          }, 2000);
+          }, 3000);
         }
       });
     }
