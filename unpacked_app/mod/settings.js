@@ -16,6 +16,8 @@ const defaultSettings = {
   // Downloader
   downloadPath: DEFAULT_DOWNLOAD_DIR,
   downloadQuality: 'mp3_320', // 'mp3_320' | 'flac' | 'mp3_192'
+  downloadConcurrency: 3, // 1 to 10 parallel download workers
+  skipExistingTracks: true, // skip already downloaded files instantly
   embedCover: true,
   embedTags: true,
   createArtistFolder: false,
@@ -34,6 +36,7 @@ const defaultSettings = {
 
 const ALLOWED_SETTING_KEYS = new Set([
   'volumeBoostEnabled', 'volumeBoost', 'downloadPath', 'downloadQuality',
+  'downloadConcurrency', 'skipExistingTracks',
   'embedCover', 'embedTags', 'createArtistFolder', 'createAlbumFolder',
   'showTrackListButtons', 'discordRpcEnabled', 'preventAutoUpdate',
   'enableDevTools', 'oledTheme', 'closeToTray'

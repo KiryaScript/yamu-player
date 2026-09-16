@@ -1,8 +1,11 @@
-// Yandex Music Enhanced Mod - Renderer Script v2.5
+// Yandex Music Enhanced Mod - Renderer Script v2.6.5
 (function() {
-  console.log('[YandexMusicMod] Injecting Mod Client v2.5...');
+  console.log('[YandexMusicMod] Injecting Mod Client v2.6.5...');
 
+  const CURRENT_MOD_VERSION = '2.6.5';
   const GITHUB_CHANGELOG_URL = 'https://raw.githubusercontent.com/KiryaScript/yamu-player/refs/heads/main/CHANGELOG.md';
+  const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/KiryaScript/yamu-player/refs/heads/main/version.json';
+  const RELEASES_PAGE_URL = 'https://github.com/KiryaScript/yamu-player/releases/latest';
 
   // Global mod-level variables and non-intercepting fetch (accessible everywhere in client.js)
   const origFetch = typeof window !== 'undefined' && window.fetch ? window.fetch.bind(window) : null;
@@ -855,6 +858,167 @@
     }
   }
 
+  function compareVersions(v1, v2) {
+    const p1 = String(v1 || '').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+    const p2 = String(v2 || '').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+      const num1 = p1[i] || 0;
+      const num2 = p2[i] || 0;
+      if (num1 > num2) return 1;
+      if (num1 < num2) return -1;
+    }
+    return 0;
+  }
+
+  async function showUpdateNotification(updateInfo) {
+    if (!updateInfo || !updateInfo.version) return;
+
+    let installType = 'standalone';
+    try {
+      if (window.yandexMod && typeof window.yandexMod.getInstallType === 'function') {
+        installType = await window.yandexMod.getInstallType();
+      }
+    } catch (e) {}
+
+    const isPatched = installType === 'patched';
+    const isMandatory = Boolean(updateInfo.mandatory);
+
+    let overlay = document.getElementById('ym-update-overlay');
+    if (overlay) overlay.remove();
+
+    overlay = document.createElement('div');
+    overlay.id = 'ym-update-overlay';
+    overlay.className = 'ym-mod-overlay';
+    overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 100000; display: flex; align-items: center; justify-content: center; font-family: system-ui, -apple-system, sans-serif;';
+
+    if (!isMandatory) {
+      overlay.onclick = (e) => {
+        if (e.target === overlay) overlay.remove();
+      };
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'ym-update-modal';
+    modal.style.cssText = 'background: #181818; border: 1px solid ' + (isMandatory ? '#ef4444' : '#333') + '; border-radius: 12px; width: 480px; max-width: 90vw; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); color: #fff; position: relative;';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;';
+
+    const titleBox = document.createElement('div');
+    titleBox.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+
+    const badgeColor = isMandatory ? '#ef4444' : '#22c55e';
+    const badgeText = isMandatory ? '🚨 Критическое обновление' : '✨ Доступно обновление мода';
+
+    titleBox.innerHTML = `
+      <span style="font-size: 16px; font-weight: 700;">${badgeText}</span>
+      <span style="background: ${badgeColor}; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px;">v${updateInfo.version}</span>
+    `;
+    header.appendChild(titleBox);
+
+    if (!isMandatory) {
+      const closeBtn = document.createElement('button');
+      closeBtn.innerHTML = '&times;';
+      closeBtn.style.cssText = 'background: none; border: none; font-size: 24px; color: #888; cursor: pointer; line-height: 1; padding: 0 4px;';
+      closeBtn.onclick = () => overlay.remove();
+      header.appendChild(closeBtn);
+    }
+
+    modal.appendChild(header);
+
+    const body = document.createElement('div');
+    body.style.cssText = 'font-size: 13px; line-height: 1.5; color: #ccc; margin-bottom: 20px;';
+
+    const typeDesc = isPatched
+      ? '<div style="background: rgba(37,99,235,0.15); border: 1px solid rgba(37,99,235,0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; color: #93c5fd; font-size: 12px;">ℹ️ Обнаружен официальный клиент с <b>патчером</b>. Для обновления скачайте новый архив патчера.</div>'
+      : '<div style="background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; color: #86efac; font-size: 12px;">ℹ️ У вас установлена <b>модифицированная сборка</b> приложения.</div>';
+
+    let changelogHtml = '';
+    if (updateInfo.changelog) {
+      changelogHtml = `
+        <div style="background: #222; border-radius: 8px; padding: 12px; margin: 10px 0; max-height: 180px; overflow-y: auto; font-size: 12px; color: #ddd; white-space: pre-wrap; font-family: inherit;">
+${updateInfo.changelog}
+        </div>
+      `;
+    }
+
+    const mandatoryWarning = isMandatory
+      ? '<div style="color: #ef4444; font-size: 12px; margin-top: 8px; font-weight: 600;">⚠️ Данное обновление является обязательным для корректной работы приложения.</div>'
+      : '';
+
+    body.innerHTML = `
+      <div style="font-weight: 600; font-size: 14px; color: #fff; margin-bottom: 6px;">${updateInfo.title || 'Новая версия Yandex Music Mod'}</div>
+      ${typeDesc}
+      ${changelogHtml}
+      ${mandatoryWarning}
+    `;
+    modal.appendChild(body);
+
+    const footer = document.createElement('div');
+    footer.style.cssText = 'display: flex; align-items: center; justify-content: flex-end; gap: 10px;';
+
+    const targetUrl = isPatched 
+      ? (updateInfo.patcherUrl || RELEASES_PAGE_URL) 
+      : (updateInfo.portableUrl || RELEASES_PAGE_URL);
+
+    if (!isMandatory) {
+      const skipBtn = document.createElement('button');
+      skipBtn.textContent = 'Позже';
+      skipBtn.style.cssText = 'background: #2a2a2a; border: 1px solid #444; color: #aaa; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px;';
+      skipBtn.onclick = () => {
+        try {
+          localStorage.setItem('ym_mod_dismissed_version', updateInfo.version);
+        } catch (e) {}
+        overlay.remove();
+      };
+      footer.appendChild(skipBtn);
+    }
+
+    const downloadBtn = document.createElement('a');
+    downloadBtn.href = targetUrl;
+    downloadBtn.target = '_blank';
+    downloadBtn.textContent = isPatched ? '⬇️ Скачать патчер' : '⬇️ Скачать обновление';
+    downloadBtn.style.cssText = 'background: #ffcc00; color: #000; font-weight: 700; padding: 8px 18px; border-radius: 6px; text-decoration: none; font-size: 13px; display: inline-block;';
+    downloadBtn.onclick = () => {
+      if (!isMandatory) overlay.remove();
+    };
+    footer.appendChild(downloadBtn);
+
+    modal.appendChild(footer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+
+  async function checkForModUpdates(isManualCheck = false) {
+    try {
+      const res = await fetch(UPDATE_CHECK_URL + '?t=' + Date.now());
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.version) {
+          const isNewer = compareVersions(data.version, CURRENT_MOD_VERSION) > 0;
+          if (isNewer) {
+            let dismissed = null;
+            try {
+              dismissed = localStorage.getItem('ym_mod_dismissed_version');
+            } catch (e) {}
+            if (data.mandatory || isManualCheck || dismissed !== data.version) {
+              await showUpdateNotification(data);
+              return true;
+            }
+          } else if (isManualCheck) {
+            showToast('У вас установлена последняя версия мода (' + CURRENT_MOD_VERSION + ')', 'success');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[ModUpdate] Failed to check for mod updates:', e);
+      if (isManualCheck) {
+        showToast('Не удалось проверить обновления: ' + e.message, 'error');
+      }
+    }
+    return false;
+  }
+
   function collectVisibleDomTracks() {
     const tracks = [];
     const seen = new Set();
@@ -1340,24 +1504,44 @@
     if (entity.type === 'album') {
       dlBtn.innerHTML = `⬇️ <span>Скачать альбом</span>`;
       dlBtn.onclick = async () => {
-        showToast('Загрузка списка треков альбома...', 'info');
-        const res = await window.yandexMod.downloadAlbum(entity.id);
-        if (res && res.success) {
-          showToast(`✅ Альбом "${res.albumTitle}" скачан (${res.downloadedCount}/${res.totalCount} треков)!`, 'success', 5000);
+        try {
+          showToast('Загрузка списка треков альбома...', 'info', 3500);
+          const res = await window.yandexMod.downloadAlbum(entity.id);
+          if (res && res.success) {
+            showToast(`✅ Альбом "${res.albumTitle}" скачан (${res.downloadedCount}/${res.totalCount} треков)!`, 'success', 6000);
+          } else {
+            showToast(`Ошибка скачивания: ${res?.error || 'Не удалось скачать альбом'}`, 'error', 6000);
+          }
+        } catch (err) {
+          showToast(`Ошибка скачивания: ${err.message || err}`, 'error', 6000);
         }
       };
     } else {
       dlBtn.innerHTML = `⬇️ <span>Скачать плейлист</span>`;
       dlBtn.onclick = async () => {
-        showToast('Загрузка списка треков...', 'info');
-        const res = await window.yandexMod.downloadPlaylist({ 
-          userId: entity.userId, 
-          playlistKind: entity.kind, 
-          uuid: entity.uuid,
-          title: pageTitle
-        });
-        if (res && res.success) {
-          showToast(`✅ Плейлист скачан (${res.downloadedCount}/${res.totalCount} треков)!`, 'success', 5000);
+        try {
+          showToast('Подготовка списка треков к скачиванию...', 'info', 4000);
+          
+          let preloadedTracks = null;
+          try {
+            preloadedTracks = await fetchAllTracksForExport(entity);
+          } catch (e) {}
+
+          const res = await window.yandexMod.downloadPlaylist({ 
+            userId: entity.userId, 
+            playlistKind: entity.kind, 
+            uuid: entity.uuid,
+            title: pageTitle,
+            tracks: (preloadedTracks && preloadedTracks.length > 0) ? preloadedTracks : undefined
+          });
+
+          if (res && res.success) {
+            showToast(`✅ Плейлист "${res.playlistTitle}" скачан (${res.downloadedCount}/${res.totalCount} треков)!`, 'success', 6000);
+          } else {
+            showToast(`Ошибка скачивания: ${res?.error || 'Не удалось скачать плейлист'}`, 'error', 6000);
+          }
+        } catch (err) {
+          showToast(`Ошибка скачивания: ${err.message || err}`, 'error', 6000);
         }
       };
     }
@@ -1444,6 +1628,32 @@
                   <span class="ym-mod-slider"></span>
                 </label>
               </div>
+
+              <div class="ym-mod-row">
+                <div class="ym-mod-label">
+                  <div class="ym-mod-label-title">Пропускать уже скачанные треки</div>
+                  <div class="ym-mod-label-desc">Не загружать повторно треки, если они уже сохранены в папке</div>
+                </div>
+                <label class="ym-mod-switch">
+                  <input type="checkbox" id="ym-skip-existing-toggle" ${settings.skipExistingTracks !== false ? 'checked' : ''}>
+                  <span class="ym-mod-slider"></span>
+                </label>
+              </div>
+
+              <div class="ym-mod-row" style="flex-direction: column; align-items: stretch; gap: 8px; margin-top: 10px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div class="ym-mod-label-title">⚡ Одновременных потоков загрузки (Воркеры)</div>
+                  <span id="ym-concurrency-val" style="background: #333; color: #ffcc00; font-weight: 700; font-size: 12px; padding: 2px 10px; border-radius: 12px;">${settings.downloadConcurrency || 3} потока</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span style="font-size: 11px; color: #888;">1</span>
+                  <input type="range" id="ym-concurrency-slider" min="1" max="10" step="1" value="${settings.downloadConcurrency || 3}" style="flex: 1; accent-color: #ffcc00; cursor: pointer;">
+                  <span style="font-size: 11px; color: #888;">10</span>
+                </div>
+                <div id="ym-concurrency-desc" class="ym-mod-label-desc" style="margin-top: 2px; font-size: 11px;">
+                  ${(settings.downloadConcurrency || 3) === 1 ? '🛡️ <b>1 поток:</b> Максимальная безопасность аккаунта (бан исключён)' : ((settings.downloadConcurrency || 3) <= 3 ? '⚡ <b>2-3 потока:</b> Рекомендуемый баланс (быстро и надёжно)' : ((settings.downloadConcurrency || 3) <= 6 ? '🚀 <b>4-6 потоков:</b> Высокая скорость (умеренная нагрузка)' : '🔥 <b>7-10 потоков:</b> Экстремальная скорость (повышенный риск временного бана аккаунта!)'))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1456,34 +1666,25 @@
               </div>
 
               <div style="margin-bottom: 14px;">
-                <div style="font-size: 13px; font-weight: 600; color: #ffcc00; margin-bottom: 8px;">Коллекция «Мне нравится»:</div>
-                <div class="ym-mod-row" style="gap: 8px; flex-wrap: wrap;">
-                  <button class="ym-mod-btn ym-mod-btn-primary" id="ym-backup-export-json" style="flex: 1; padding: 9px; min-width: 120px;">
-                    📦 JSON (Полный)
-                  </button>
-                  <button class="ym-mod-btn" id="ym-backup-export-txt" style="flex: 1; padding: 9px; min-width: 120px;">
-                    📄 TXT (Список)
-                  </button>
-                  <button class="ym-mod-btn" id="ym-backup-export-m3u" style="flex: 1; padding: 9px; min-width: 120px;">
-                    🎵 M3U8 (Плейлист)
-                  </button>
-                  <button class="ym-mod-btn" id="ym-backup-export-csv" style="flex: 1; padding: 9px; min-width: 120px;">
-                    📊 CSV (Таблица)
-                  </button>
-                </div>
-              </div>
-
-              <div style="margin-bottom: 16px;">
-                <button class="ym-mod-btn" id="ym-export-current-page-btn" style="width: 100%; justify-content: center; padding: 10px; background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15);">
-                  📋 Сохранить текущий открытый плейлист / альбом
+                <div class="ym-mod-label-title" style="margin-bottom: 8px;">Быстрый экспорт текущей страницы:</div>
+                <button class="ym-mod-btn ym-mod-btn-primary" id="ym-export-current-page-btn" style="width: 100%; justify-content: center; padding: 10px;">
+                  📑 Экспортировать открытый плейлист / альбом
                 </button>
               </div>
 
-              <hr style="border: 0; height: 1px; background: rgba(255, 255, 255, 0.1); margin: 18px 0;">
+              <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+                <div style="font-size: 13px; font-weight: 600; color: #ddd; margin-bottom: 8px;">Резервная копия всей коллекции «Мне нравится»:</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <button class="ym-mod-btn" id="ym-backup-export-json" style="justify-content: center;">📄 Сохранить в JSON</button>
+                  <button class="ym-mod-btn" id="ym-backup-export-txt" style="justify-content: center;">📝 Сохранить в TXT</button>
+                  <button class="ym-mod-btn" id="ym-backup-export-m3u" style="justify-content: center;">🎵 Сохранить в M3U8</button>
+                  <button class="ym-mod-btn" id="ym-backup-export-csv" style="justify-content: center;">📊 Сохранить в CSV</button>
+                </div>
+              </div>
 
-              <div class="ym-mod-section-title">🔄 Импорт и перенос библиотеки (между аккаунтами)</div>
-              <div class="ym-mod-label-desc" style="margin-bottom: 12px;">
-                Загрузите сохранённый список (JSON, TXT, M3U8, CSV). Мод автоматически найдёт треки в каталоге и перенесёт их на текущий аккаунт.
+              <div class="ym-mod-section-title" style="margin-top: 18px;">🔄 Импорт и перенос музыки</div>
+              <div class="ym-mod-label-desc" style="margin-bottom: 10px;">
+                Загрузите сохранённый файл коллекции (JSON, TXT, M3U8 или CSV), чтобы быстро перенести всю музыку на новый или другой аккаунт Яндекс Музыки!
               </div>
 
               <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
@@ -1587,6 +1788,12 @@
                   📜 Открыть историю изменений (Changelog с GitHub)
                 </button>
               </div>
+
+              <div class="ym-mod-row" style="margin-top: 8px;">
+                <button class="ym-mod-btn ym-mod-btn-primary" id="ym-check-updates-btn" style="width: 100%; justify-content: center; padding: 10px;">
+                  🔄 Проверить обновления мода
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1627,6 +1834,47 @@
         settings.showTrackListButtons = e.target.checked;
         debouncedSaveSettings({ showTrackListButtons: e.target.checked });
         injectTrackListButtons();
+      };
+    }
+
+    const skipExistingToggle = document.getElementById('ym-skip-existing-toggle');
+    if (skipExistingToggle) {
+      skipExistingToggle.onchange = (e) => {
+        settings.skipExistingTracks = e.target.checked;
+        debouncedSaveSettings({ skipExistingTracks: e.target.checked });
+      };
+    }
+
+    const concurrencySlider = document.getElementById('ym-concurrency-slider');
+    const concurrencyVal = document.getElementById('ym-concurrency-val');
+    const concurrencyDesc = document.getElementById('ym-concurrency-desc');
+    if (concurrencySlider && concurrencyVal) {
+      const updateConcurrencyHint = (val) => {
+        concurrencyVal.textContent = `${val} ${val === 1 ? 'поток' : (val < 5 ? 'потока' : 'потоков')}`;
+        if (concurrencyDesc) {
+          if (val === 1) {
+            concurrencyDesc.innerHTML = '🛡️ <b>1 поток:</b> Максимальная безопасность аккаунта (бан исключён)';
+            concurrencyDesc.style.color = '#86efac';
+          } else if (val <= 3) {
+            concurrencyDesc.innerHTML = '⚡ <b>2-3 потока:</b> Рекомендуемый баланс (быстро и надёжно)';
+            concurrencyDesc.style.color = '#93c5fd';
+          } else if (val <= 6) {
+            concurrencyDesc.innerHTML = '🚀 <b>4-6 потоков:</b> Высокая скорость (умеренная нагрузка)';
+            concurrencyDesc.style.color = '#fde047';
+          } else {
+            concurrencyDesc.innerHTML = '🔥 <b>7-10 потоков:</b> Экстремальная скорость (повышенный риск временного бана аккаунта!)';
+            concurrencyDesc.style.color = '#f87171';
+          }
+        }
+      };
+      concurrencySlider.oninput = (e) => {
+        const val = parseInt(e.target.value, 10);
+        updateConcurrencyHint(val);
+      };
+      concurrencySlider.onchange = (e) => {
+        const val = parseInt(e.target.value, 10);
+        settings.downloadConcurrency = val;
+        debouncedSaveSettings({ downloadConcurrency: val });
       };
     }
 
@@ -1801,6 +2049,14 @@
       openChangelogModal();
     };
 
+    const checkUpdatesBtn = document.getElementById('ym-check-updates-btn');
+    if (checkUpdatesBtn) {
+      checkUpdatesBtn.onclick = () => {
+        showToast('Проверка обновлений мода...', 'info');
+        checkForModUpdates(true);
+      };
+    }
+
     return overlay;
   }
 
@@ -1848,7 +2104,62 @@
       });
     }
 
-    console.log('[YandexMusicMod] Mod Client v2.5 initialized successfully.');
+    if (window.yandexMod && window.yandexMod.onDownloadProgress) {
+      let activeProgressToast = null;
+      let hideProgressTimeout = null;
+
+      window.yandexMod.onDownloadProgress((p) => {
+        if (!p) return;
+        
+        const title = p.playlistTitle || p.albumTitle || '';
+        const indexStr = (p.totalTracks && p.totalTracks > 1) ? `[${p.currentTrackIndex || 1}/${p.totalTracks}] ` : '';
+        const trackName = p.trackTitle || p.filename || '';
+        const percentStr = (typeof p.percent === 'number' && p.percent >= 0) ? ` (${p.percent}%)` : '';
+        const msg = `📥 ${indexStr}${title ? title + ': ' : ''}${trackName}${percentStr}`;
+
+        if (!activeProgressToast || !activeProgressToast.parentElement) {
+          activeProgressToast = showToast(msg, 'info', 30000);
+          if (activeProgressToast && (p.totalTracks > 1 || p.playlistTitle || p.albumTitle)) {
+            const stopBtn = document.createElement('button');
+            stopBtn.className = 'ym-stop-download-btn';
+            stopBtn.textContent = '⏹️ Стоп';
+            stopBtn.style.cssText = 'background: rgba(239, 68, 68, 0.25); border: 1px solid #ef4444; color: #fca5a5; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 8px; white-space: nowrap; flex-shrink: 0;';
+            stopBtn.onclick = (e) => {
+              e.stopPropagation();
+              if (window.yandexMod && window.yandexMod.cancelDownload) {
+                window.yandexMod.cancelDownload();
+                showToast('🛑 Остановка скачивания...', 'info', 3000);
+              }
+              if (activeProgressToast) {
+                activeProgressToast.remove();
+                activeProgressToast = null;
+              }
+            };
+            activeProgressToast.appendChild(stopBtn);
+          }
+        } else {
+          const textEl = activeProgressToast.querySelector('div:nth-child(2)');
+          if (textEl) textEl.textContent = msg;
+        }
+
+        clearTimeout(hideProgressTimeout);
+        if (p.totalTracks && p.currentTrackIndex === p.totalTracks && p.percent === 100) {
+          hideProgressTimeout = setTimeout(() => {
+            if (activeProgressToast) {
+              activeProgressToast.remove();
+              activeProgressToast = null;
+            }
+          }, 2000);
+        }
+      });
+    }
+
+    // Auto-check for mod updates shortly after launch
+    setTimeout(() => {
+      checkForModUpdates(false);
+    }, 3500);
+
+    console.log('[YandexMusicMod] Mod Client v2.6.5 initialized successfully.');
   }
 
   if (document.readyState === 'loading') {

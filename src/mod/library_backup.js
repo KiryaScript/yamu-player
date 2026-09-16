@@ -178,7 +178,19 @@ class LibraryBackupManager {
       } catch (e) {}
     }
 
-    // Attempt 2: Extract directly from session cookies
+    // Attempt 2: Web auth handler (music.yandex.ru/handlers/auth.jsx)
+    try {
+      const authData = await this.fetchJson('https://music.yandex.ru/handlers/auth.jsx', cookieHeader);
+      if (authData?.user?.uid) {
+        return {
+          uid: String(authData.user.uid),
+          login: authData.user.login || String(authData.user.uid),
+          name: authData.user.name || authData.user.login || 'User'
+        };
+      }
+    } catch (e) {}
+
+    // Attempt 3: Extract directly from session cookies
     try {
       const cookies = await this.getSessionCookies();
       const uidCookie = cookies.find(c => c.name === 'uid');
@@ -218,6 +230,17 @@ class LibraryBackupManager {
           console.warn(`[Backup] Failed to fetch likes from ${host}:`, e.message);
         }
       }
+    }
+
+    // Fallback: Web player handler for likes (handlers/playlist.jsx?owner=me&kinds=3)
+    if (rawTracks.length === 0) {
+      try {
+        const hData = await this.fetchJson('https://music.yandex.ru/handlers/playlist.jsx?owner=me&kinds=3', extraHeaders);
+        if (hData?.playlist?.tracks && hData.playlist.tracks.length > 0) {
+          rawTracks = hData.playlist.tracks;
+          console.log(`[Backup] Retrieved ${rawTracks.length} liked tracks via handlers/playlist.jsx fallback`);
+        }
+      } catch (e) {}
     }
 
     // If rawTracks contains bare IDs or lacks full metadata, batch resolve via /tracks?trackIds=...

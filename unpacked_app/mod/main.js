@@ -150,6 +150,21 @@ function initMod(mainWindow) {
     });
   });
 
+  electron.ipcMain.handle('mod:cancel-download', () => {
+    downloader.cancelDownload();
+    return { success: true };
+  });
+
+  electron.ipcMain.handle('mod:get-install-type', () => {
+    try {
+      const exePath = electron.app.getPath('exe').toLowerCase();
+      if (exePath.includes('programs\\yandexmusic') || exePath.includes('program files')) {
+        return 'patched';
+      }
+    } catch (e) {}
+    return 'standalone';
+  });
+
   // 6. IPC Handlers: Library Backup, Playlist Export & Transfer
   electron.ipcMain.handle('mod:export-backup', async (event, format = 'json', clientTracks = []) => {
     return await libraryBackup.exportBackup(format, clientTracks);

@@ -51,25 +51,40 @@ function isPathInside(baseDir, targetPath) {
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
+let libraryBackup = null;
+try {
+  libraryBackup = require('./library_backup');
+} catch (e) {}
+
 class Downloader {
   constructor() {
     this.queue = [];
     this.activeDownloads = new Map();
+    this.isCancelled = false;
+  }
+
+  cancelDownload() {
+    this.isCancelled = true;
+    for (const [id, req] of this.activeDownloads.entries()) {
+      try {
+        if (typeof req.destroy === 'function') req.destroy();
+      } catch (e) {}
+    }
+    this.activeDownloads.clear();
+    console.log('[Downloader] Active downloads cancelled.');
   }
 
   async getSessionCookieHeader() {
-    if (!electronSession || !electronSession.defaultSession) {
-      return '';
-    }
+    if (!electronSession || !electronSession.defaultSession) return '';
     try {
-      const cookies = await electronSession.defaultSession.cookies.get({ domain: 'yandex.ru' });
+      const cookies = await electronSession.defaultSession.cookies.get({});
       const importantNames = new Set([
-        'Session_id', 'sessionid2', 'yandexuid', 'uid', 'yandex_login', 
+        'Session_id', 'sessionid2', 'yandex_login', 'i-cookie', 'yandexuid', 'uid',
         'L', 'mda2_beacon', 'my', 'device_id', 'yashr'
       ]);
       const unique = {};
       cookies.forEach(c => {
-        if (c.name && c.value && (importantNames.has(c.name) || c.name.startsWith('Session_') || c.name.startsWith('yp'))) {
+        if (c.name && c.value && (importantNames.has(c.name) || c.name.startsWith('Session_') || c.name.startsWith('yp') || c.name.startsWith('ys'))) {
           unique[c.name] = c.value;
         }
       });
@@ -80,11 +95,17 @@ class Downloader {
   }
 
   async getUserId() {
+    if (libraryBackup && typeof libraryBackup.getCurrentUser === 'function') {
+      try {
+        const u = await libraryBackup.getCurrentUser();
+        if (u && u.uid) return String(u.uid);
+      } catch (e) {}
+    }
     if (!electronSession || !electronSession.defaultSession) return null;
     try {
-      const cookies = await electronSession.defaultSession.cookies.get({ domain: 'yandex.ru' });
-      const uid = cookies.find(c => c.name === 'yandexuid' || c.name === 'uid' || c.name === 'Session_id');
-      if (uid) return uid.value;
+      const cookies = await electronSession.defaultSession.cookies.get({});
+      const uidCookie = cookies.find(c => c.name === 'uid');
+      if (uidCookie && uidCookie.value) return String(uidCookie.value);
     } catch (e) {}
     return null;
   }
@@ -453,6 +474,31 @@ class Downloader {
       throw new Error('Недопустимый путь сохранения файла');
     }
 
+    // Smart Skip: If file already exists and size > 100KB, skip downloading!
+    if (settings.skipExistingTracks !== false && fs.existsSync(filePath)) {
+      try {
+        const stats = fs.statSync(filePath);
+        if (stats.size > 100 * 1024) {
+          console.log(`[Downloader] Skipping existing track: ${filename} (${Math.round(stats.size / 1024)} KB)`);
+          if (onProgress) {
+            onProgress({ percent: 100, downloadedBytes: stats.size, totalBytes: stats.size, speed: 0 });
+          }
+          return {
+            success: true,
+            skipped: true,
+            trackId,
+            title,
+            artists,
+            album,
+            filePath,
+            filename,
+            codec,
+            bitrate: bitrate || 320
+          };
+        }
+      } catch (e) {}
+    }
+
     let audioBuffer;
     try {
       audioBuffer = await this.downloadStreamWithProgress(directUrl, onProgress, trackId, title, artists);
@@ -604,33 +650,68 @@ class Downloader {
       });
     });
 
+    this.isCancelled = false;
+    const concurrency = Math.max(1, Math.min(10, parseInt(settings.downloadConcurrency, 10) || 3));
     const results = [];
-    for (let i = 0; i < allTracksWithMeta.length; i++) {
-      const item = allTracksWithMeta[i];
-      try {
-        const res = await this.downloadSingleTrack(item.track, albumDir, (p) => {
-          if (onProgress) {
-            onProgress({
-              albumTitle,
-              currentTrackIndex: i + 1,
-              totalTracks: allTracksWithMeta.length,
-              ...p
-            });
-          }
-        }, item.prefix);
-        results.push(res);
-        if (onTrackDone) onTrackDone(res, i + 1, allTracksWithMeta.length);
-      } catch (err) {
-        console.error(`[Downloader] Error downloading track:`, err);
+    let completedCount = 0;
+    let skippedCount = 0;
+    let activeTrackIndex = 0;
+
+    const worker = async (workerId) => {
+      if (workerId > 0) {
+        await new Promise(r => setTimeout(r, workerId * 150));
       }
+
+      while (activeTrackIndex < allTracksWithMeta.length) {
+        if (this.isCancelled) break;
+
+        const currentIndex = activeTrackIndex++;
+        if (currentIndex >= allTracksWithMeta.length) break;
+
+        const item = allTracksWithMeta[currentIndex];
+        try {
+          const res = await this.downloadSingleTrack(item.track, albumDir, (p) => {
+            if (onProgress) {
+              onProgress({
+                albumTitle,
+                currentTrackIndex: completedCount + 1,
+                totalTracks: allTracksWithMeta.length,
+                downloadedCount: results.length - skippedCount,
+                skippedCount,
+                trackTitle: item.track?.title || item.track?.name || '',
+                ...p
+              });
+            }
+          }, item.prefix);
+
+          if (res?.skipped) skippedCount++;
+          results.push(res);
+          completedCount++;
+          if (onTrackDone) onTrackDone(res, completedCount, allTracksWithMeta.length);
+        } catch (err) {
+          completedCount++;
+          console.error(`[Downloader] Error downloading album track #${currentIndex + 1}:`, err.message);
+        }
+
+        const jitter = 50 + Math.floor(Math.random() * 100);
+        await new Promise(r => setTimeout(r, jitter));
+      }
+    };
+
+    const workers = [];
+    for (let i = 0; i < Math.min(concurrency, allTracksWithMeta.length); i++) {
+      workers.push(worker(i));
     }
+    await Promise.all(workers);
 
     return {
-      success: true,
+      success: !this.isCancelled,
+      cancelled: this.isCancelled,
       albumTitle,
       artistName,
       folderPath: albumDir,
-      downloadedCount: results.length,
+      downloadedCount: results.length - skippedCount,
+      skippedCount,
       totalCount: allTracksWithMeta.length
     };
   }
@@ -641,12 +722,14 @@ class Downloader {
     let kind = null;
     let customTitle = null;
     let preloadedTracks = null;
+    let uuid = null;
 
     if (typeof userIdOrParams === 'object' && userIdOrParams !== null) {
       userId = userIdOrParams.userId;
       kind = userIdOrParams.playlistKind || userIdOrParams.kind;
       customTitle = userIdOrParams.title || userIdOrParams.playlistTitle;
       preloadedTracks = userIdOrParams.tracks;
+      uuid = userIdOrParams.uuid;
       if (typeof playlistKind === 'function') {
         onProgress = playlistKind;
         playlistKind = null;
@@ -662,38 +745,76 @@ class Downloader {
     if (Array.isArray(preloadedTracks) && preloadedTracks.length > 0) {
       allTracks = preloadedTracks;
     } else {
-      let isLikes = (kind === 'likes' || kind === '3' || userId === 'likes' || !kind);
-      let playlistUrl;
+      let isLikes = (kind === 'likes' || kind === '3' || userId === 'likes' || !kind ||
+                     String(customTitle).toLowerCase().includes('мне нравится') ||
+                     String(customTitle).toLowerCase().includes('коллекция'));
 
       if (isLikes) {
-        const actualUid = await this.getUserId() || userId || '3';
-        playlistUrl = `https://api.music.yandex.net/users/${actualUid}/playlists/3`;
-      } else if (kind) {
-        playlistUrl = `https://api.music.yandex.net/users/${userId}/playlists/${kind}`;
-      } else {
-        playlistUrl = `https://api.music.yandex.net/playlists/${userId}`;
+        playlistTitle = 'Мне нравится';
+        if (libraryBackup) {
+          try {
+            const likedRes = await libraryBackup.fetchLikedTracks();
+            if (likedRes && likedRes.tracks && likedRes.tracks.length > 0) {
+              allTracks = likedRes.tracks;
+            }
+          } catch (e) {
+            console.warn('[Downloader] fetchLikedTracks error:', e.message);
+          }
+        }
+      } else if (uuid && libraryBackup) {
+        try {
+          const cookieHeader = await this.getSessionCookieHeader();
+          const uRes = await libraryBackup.fetchJson(`https://api.music.yandex.ru/playlists/${encodeURIComponent(uuid)}`, { Cookie: cookieHeader });
+          if (uRes?.result?.tracks) {
+            allTracks = uRes.result.tracks;
+            if (uRes.result.title) playlistTitle = uRes.result.title;
+          }
+        } catch (e) {}
+      } else if (userId && kind && libraryBackup) {
+        try {
+          const cookieHeader = await this.getSessionCookieHeader();
+          const pRes = await libraryBackup.fetchJson(`https://api.music.yandex.ru/users/${encodeURIComponent(userId)}/playlists/${encodeURIComponent(kind)}`, { Cookie: cookieHeader });
+          if (pRes?.result?.tracks) {
+            allTracks = pRes.result.tracks;
+            if (pRes.result.title) playlistTitle = pRes.result.title;
+          }
+        } catch (e) {}
       }
 
-      let data;
-      try {
-        data = await this.fetchJson(playlistUrl);
-      } catch (err) {
-        if (isLikes) {
-          const actualUid = await this.getUserId() || '3';
-          data = await this.fetchJson(`https://api.music.yandex.net/users/${actualUid}/likes/tracks`);
-        } else {
-          throw err;
+      // Fallback: Web player handler for likes
+      if (allTracks.length === 0 && isLikes) {
+        try {
+          const cookieHeader = await this.getSessionCookieHeader();
+          const hData = await this.fetchJson('https://music.yandex.ru/handlers/playlist.jsx?owner=me&kinds=3', { Cookie: cookieHeader });
+          if (hData?.playlist?.tracks && hData.playlist.tracks.length > 0) {
+            allTracks = hData.playlist.tracks;
+            if (hData.playlist.title) playlistTitle = hData.playlist.title;
+          }
+        } catch (e) {}
+      }
+
+      // If tracks are bare IDs (e.g. from likes without metadata), batch resolve metadata in chunks of 100
+      if (allTracks.length > 0 && !allTracks[0]?.title && !allTracks[0]?.track?.title && (allTracks[0]?.id || allTracks[0]?.trackId)) {
+        console.log(`[Downloader] Resolving metadata for ${allTracks.length} tracks in batches of 100...`);
+        const trackIds = allTracks.map(t => t.id || t.trackId || t.track?.id).filter(Boolean);
+        const resolved = [];
+        for (let i = 0; i < trackIds.length; i += 100) {
+          const batch = trackIds.slice(i, i + 100);
+          try {
+            const bData = await this.fetchJson(`https://api.music.yandex.ru/tracks?trackIds=${batch.join(',')}`);
+            if (bData?.result && Array.isArray(bData.result)) {
+              resolved.push(...bData.result);
+            }
+          } catch (e) {}
+        }
+        if (resolved.length > 0) {
+          allTracks = resolved;
         }
       }
+    }
 
-      const playlist = data?.result;
-      if (!playlist) {
-        throw new Error('Плейлист не найден');
-      }
-
-      playlistTitle = playlist.title || playlistTitle || 'Мне нравится';
-      const rawTracks = playlist.tracks || playlist.library?.tracks || [];
-      allTracks = rawTracks.map(t => t.track || t).filter(Boolean);
+    if (!allTracks || allTracks.length === 0) {
+      throw new Error(`В плейлисте "${playlistTitle}" не найдено треков для скачивания`);
     }
 
     const safePlaylistTitle = sanitizeFilename(playlistTitle, 50);
@@ -703,33 +824,75 @@ class Downloader {
       await fsPromises.mkdir(playlistDir, { recursive: true });
     }
 
+    this.isCancelled = false;
+    const concurrency = Math.max(1, Math.min(10, parseInt(settings.downloadConcurrency, 10) || 3));
+    console.log(`[Downloader] Starting multi-worker download for ${allTracks.length} tracks with ${concurrency} workers...`);
+
     const results = [];
-    for (let i = 0; i < allTracks.length; i++) {
-      const track = allTracks[i];
-      const trackNum = String(i + 1).padStart(3, '0');
-      try {
-        const res = await this.downloadSingleTrack(track, playlistDir, (p) => {
-          if (onProgress) {
-            onProgress({
-              playlistTitle: safePlaylistTitle,
-              currentTrackIndex: i + 1,
-              totalTracks: allTracks.length,
-              ...p
-            });
-          }
-        }, trackNum);
-        results.push(res);
-        if (onTrackDone) onTrackDone(res, i + 1, allTracks.length);
-      } catch (err) {
-        console.error(`[Downloader] Error downloading playlist track:`, err);
+    let completedCount = 0;
+    let skippedCount = 0;
+    let activeTrackIndex = 0;
+
+    const worker = async (workerId) => {
+      if (workerId > 0) {
+        await new Promise(r => setTimeout(r, workerId * 150));
       }
+
+      while (activeTrackIndex < allTracks.length) {
+        if (this.isCancelled) {
+          console.log(`[Downloader] Worker #${workerId + 1} stopped due to cancellation.`);
+          break;
+        }
+
+        const currentIndex = activeTrackIndex++;
+        if (currentIndex >= allTracks.length) break;
+
+        const rawTrack = allTracks[currentIndex];
+        const track = rawTrack.track || rawTrack;
+        const trackNum = String(currentIndex + 1).padStart(3, '0');
+
+        try {
+          const res = await this.downloadSingleTrack(track, playlistDir, (p) => {
+            if (onProgress) {
+              onProgress({
+                playlistTitle: safePlaylistTitle,
+                currentTrackIndex: completedCount + 1,
+                totalTracks: allTracks.length,
+                downloadedCount: results.length - skippedCount,
+                skippedCount,
+                trackTitle: track.title || track.name || '',
+                ...p
+              });
+            }
+          }, trackNum);
+
+          if (res?.skipped) skippedCount++;
+          results.push(res);
+          completedCount++;
+          if (onTrackDone) onTrackDone(res, completedCount, allTracks.length);
+        } catch (err) {
+          completedCount++;
+          console.error(`[Downloader] Error downloading playlist track #${currentIndex + 1}:`, err.message);
+        }
+
+        const jitter = 50 + Math.floor(Math.random() * 100);
+        await new Promise(r => setTimeout(r, jitter));
+      }
+    };
+
+    const workers = [];
+    for (let i = 0; i < Math.min(concurrency, allTracks.length); i++) {
+      workers.push(worker(i));
     }
+    await Promise.all(workers);
 
     return {
-      success: true,
+      success: !this.isCancelled,
+      cancelled: this.isCancelled,
       playlistTitle: safePlaylistTitle,
       folderPath: playlistDir,
-      downloadedCount: results.length,
+      downloadedCount: results.length - skippedCount,
+      skippedCount,
       totalCount: allTracks.length
     };
   }

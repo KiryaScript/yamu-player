@@ -248,6 +248,8 @@ electron.contextBridge.exposeInMainWorld("yandexMod", {
   downloadTrack: (track) => electron.ipcRenderer.invoke('mod:download-track', track),
   downloadAlbum: (albumId) => electron.ipcRenderer.invoke('mod:download-album', albumId),
   downloadPlaylist: (playlistData) => electron.ipcRenderer.invoke('mod:download-playlist', playlistData),
+  cancelDownload: () => electron.ipcRenderer.invoke('mod:cancel-download'),
+  getInstallType: () => electron.ipcRenderer.invoke('mod:get-install-type'),
   exportBackup: (format, clientTracks) => electron.ipcRenderer.invoke('mod:export-backup', format, clientTracks),
   exportPlaylist: (playlistData, format) => electron.ipcRenderer.invoke('mod:export-playlist', playlistData, format),
   getUserPlaylists: () => electron.ipcRenderer.invoke('mod:get-user-playlists'),

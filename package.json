@@ -1,6 +1,6 @@
 {
   "name": "yandex-music-enhanced-mod",
-  "version": "5.116.3-mod.2.5",
+  "version": "5.116.3-mod.2.6.5",
   "description": "Enhanced mod for Yandex Music desktop client featuring Discord RPC, Downloader, AMOLED theme, and Library Backup.",
   "main": "src/index.js",
   "scripts": {
