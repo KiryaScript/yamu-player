@@ -255,26 +255,26 @@ const exposeYandexModBridge = () => {
     }
   });
 
-  window.document.addEventListener("DOMContentLoaded", () => {
-    try {
-      const assets = electron.ipcRenderer.sendSync('mod:get-assets');
-      if (assets && assets.css) {
-        const styleEl = document.createElement('style');
-        styleEl.id = 'ym-mod-injected-styles';
-        styleEl.textContent = assets.css;
-        document.head.appendChild(styleEl);
-      }
-
-      if (assets && assets.js) {
-        const scriptEl = document.createElement('script');
-        scriptEl.id = 'ym-mod-injected-script';
-        scriptEl.textContent = assets.js;
-        document.body.appendChild(scriptEl);
-      }
-    } catch (err) {
-      console.error('[Preload] Failed to inject Mod client:', err);
+  try {
+    const assets = electron.ipcRenderer.sendSync('mod:get-assets');
+    if (assets && assets.js) {
+      electron.webFrame.executeJavaScript(assets.js);
     }
-  });
+    window.document.addEventListener("DOMContentLoaded", () => {
+      try {
+        if (assets && assets.css) {
+          const styleEl = document.createElement('style');
+          styleEl.id = 'ym-mod-injected-styles';
+          styleEl.textContent = assets.css;
+          document.head.appendChild(styleEl);
+        }
+      } catch (err) {
+        console.error('[Preload] Failed to inject Mod styles:', err);
+      }
+    });
+  } catch (err) {
+    console.error('[Preload] Failed to inject Mod client assets:', err);
+  }
 };
 
 const installApplicationMod = () => {

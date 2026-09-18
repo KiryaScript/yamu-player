@@ -115,38 +115,65 @@
 
         if (isAccountStatusUrl(url)) {
           try {
-            const clone = res.clone();
-            const json = await clone.json();
-            if (json) {
-              if (json.result) {
-                json.result.account = { ...(json.result.account || {}), ...plusData };
-                json.result.permissions = plusPerms;
-                json.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
-                json.result.subscription = {
-                  canStartTrial: false,
-                  mcdonalds: false,
-                  autoRenewable: [{
-                    expires: "2099-01-01T00:00:00+00:00",
-                    vendor: "Yandex",
-                    product: { productId: "plus", type: "subscription" },
-                    finished: false
-                  }],
-                  hadAnySubscription: true
-                };
-              }
-              if (json.uid || 'hasPlus' in json || url.includes('account/about')) {
-                json.hasPlus = true;
-                json.serviceAvailable = true;
-                if (!json.options) json.options = [];
-                if (!json.options.includes('plus')) json.options.push('plus');
-              }
-              return new Response(JSON.stringify(json), {
-                status: res.status,
-                statusText: res.statusText,
-                headers: res.headers
-              });
+            let json = null;
+            try {
+              const clone = res.clone();
+              json = await clone.json();
+            } catch (err) {}
+            if (!json || typeof json !== 'object') {
+              json = { result: {} };
             }
-          } catch (e) {}
+            if (json.result && typeof json.result === 'object') {
+              json.result.account = { ...(json.result.account || {}), ...plusData };
+              json.result.permissions = plusPerms;
+              json.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
+              json.result.hasPlus = true;
+              json.result.hasMusicSubscription = true;
+              json.result.serviceAvailable = true;
+              if (!Array.isArray(json.result.options)) json.result.options = [];
+              if (!json.result.options.includes('plus')) json.result.options.push('plus');
+              json.result.subscription = {
+                canStartTrial: false,
+                mcdonalds: false,
+                autoRenewable: [{
+                  expires: "2099-01-01T00:00:00+00:00",
+                  vendor: "Yandex",
+                  product: { productId: "plus", type: "subscription" },
+                  finished: false
+                }],
+                hadAnySubscription: true
+              };
+            }
+            json.hasPlus = true;
+            json.hasMusicSubscription = true;
+            json.serviceAvailable = true;
+            if (!Array.isArray(json.options)) json.options = [];
+            if (!json.options.includes('plus')) json.options.push('plus');
+
+            return new Response(JSON.stringify(json), {
+              status: 200,
+              statusText: "OK",
+              headers: { "content-type": "application/json; charset=utf-8" }
+            });
+          } catch (e) {
+            const fallback = {
+              hasPlus: true,
+              serviceAvailable: true,
+              options: ['plus'],
+              result: {
+                hasPlus: true,
+                serviceAvailable: true,
+                options: ['plus'],
+                account: plusData,
+                permissions: plusPerms
+              }
+            };
+            return new Response(JSON.stringify(fallback), {
+              status: 200,
+              statusText: "OK",
+              headers: { "content-type": "application/json; charset=utf-8" }
+            });
+          }
         }
 
         return res;
@@ -166,24 +193,31 @@
     window.XMLHttpRequest.prototype.send = function(...sendArgs) {
       if (this._url && isAccountStatusUrl(this._url)) {
         this.addEventListener('readystatechange', () => {
-          if (this.readyState === 4 && this.status === 200) {
+          if (this.readyState === 4) {
             try {
-              const data = JSON.parse(this.responseText);
-              if (data) {
-                if (data.result) {
-                  data.result.account = { ...(data.result.account || {}), ...plusData };
-                  data.result.permissions = plusPerms;
-                  data.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
-                }
-                if (data.uid || 'hasPlus' in data || (this._url && this._url.includes('account/about'))) {
-                  data.hasPlus = true;
-                  data.serviceAvailable = true;
-                  if (!data.options) data.options = [];
-                  if (!data.options.includes('plus')) data.options.push('plus');
-                }
-                Object.defineProperty(this, 'responseText', { value: JSON.stringify(data) });
-                Object.defineProperty(this, 'response', { value: JSON.stringify(data) });
+              let data = null;
+              try { data = JSON.parse(this.responseText); } catch (e) {}
+              if (!data || typeof data !== 'object') data = { result: {} };
+              if (data.result && typeof data.result === 'object') {
+                data.result.account = { ...(data.result.account || {}), ...plusData };
+                data.result.permissions = plusPerms;
+                data.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
+                data.result.hasPlus = true;
+                data.result.hasMusicSubscription = true;
+                data.result.serviceAvailable = true;
+                if (!Array.isArray(data.result.options)) data.result.options = [];
+                if (!data.result.options.includes('plus')) data.result.options.push('plus');
               }
+              data.hasPlus = true;
+              data.hasMusicSubscription = true;
+              data.serviceAvailable = true;
+              if (!Array.isArray(data.options)) data.options = [];
+              if (!data.options.includes('plus')) data.options.push('plus');
+
+              Object.defineProperty(this, 'status', { value: 200, configurable: true });
+              Object.defineProperty(this, 'statusText', { value: 'OK', configurable: true });
+              Object.defineProperty(this, 'responseText', { value: JSON.stringify(data), configurable: true });
+              Object.defineProperty(this, 'response', { value: JSON.stringify(data), configurable: true });
             } catch (e) {}
           }
         });
