@@ -1,128 +1,8 @@
 'use strict';
-
-// ---------------------------------------------------------
-// GLOBAL AUDIO ELEMENT TRACKER FOR DISCORD RPC & PLAYER
-// ---------------------------------------------------------
-try {
-  window.__ymActiveAudio = null;
-  const origPlay = HTMLMediaElement.prototype.play;
-  if (origPlay) {
-    HTMLMediaElement.prototype.play = function(...args) {
-      window.__ymActiveAudio = this;
-      return origPlay.apply(this, args);
-    };
-  }
-  const origCreateEl = document.createElement.bind(document);
-  document.createElement = function(tagName, options) {
-    const el = origCreateEl(tagName, options);
-    if (tagName && String(tagName).toLowerCase() === 'audio') {
-      window.__ymActiveAudio = el;
-      el.addEventListener('play', () => { window.__ymActiveAudio = el; });
-      el.addEventListener('playing', () => { window.__ymActiveAudio = el; });
-    }
-    return el;
-  };
-} catch (e) {}
-
-// ---------------------------------------------------------
-// YANDEX PLUS SUBSCRIPTION UNLOCKER (PRO FEATURES & HQ AUDIO)
-// ---------------------------------------------------------
-try {
-  const plusAccountData = {
-    serviceAvailable: true,
-    hasSubscription: true,
-    hasPlus: true,
-    plus: { hasPlus: true, isAvailable: true, isTutorialCompleted: true },
-    subeditor: false,
-    subeditorLevel: 0
-  };
-
-  const plusPermissions = {
-    until: "2099-01-01T00:00:00+00:00",
-    values: [
-      "landing", "feed", "radio", "mixes", "play-audio", "play-video",
-      "play-radio", "user-music", "user-radio", "user-mixes", "user-playlists",
-      "non-stop", "high-quality", "tracks-availability", "download-tracks",
-      "premium", "lossless", "hq-audio", "offline", "skip-track", "ads-free"
-    ],
-    default: [
-      "landing", "feed", "radio", "mixes", "play-audio", "play-video",
-      "play-radio", "user-music", "user-radio", "user-mixes", "user-playlists",
-      "non-stop", "high-quality", "tracks-availability", "download-tracks",
-      "premium", "lossless", "hq-audio", "offline", "skip-track", "ads-free"
-    ]
-  };
-
-  const origFetch = window.fetch;
-  if (origFetch) {
-    window.fetch = async function(...args) {
-      const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
-      const res = await origFetch.apply(this, args);
-
-      if (url.includes('/account/status') || url.includes('/status')) {
-        try {
-          const clone = res.clone();
-          const json = await clone.json();
-          if (json && json.result) {
-            json.result.account = { ...(json.result.account || {}), ...plusAccountData };
-            json.result.permissions = plusPermissions;
-            json.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
-            json.result.subscription = {
-              canStartTrial: false,
-              mcdonalds: false,
-              autoRenewable: [{
-                expires: "2099-01-01T00:00:00+00:00",
-                vendor: "Yandex",
-                product: { productId: "plus", type: "subscription" },
-                finished: false
-              }],
-              hadAnySubscription: true
-            };
-            return new Response(JSON.stringify(json), {
-              status: res.status,
-              statusText: res.statusText,
-              headers: res.headers
-            });
-          }
-        } catch (e) {}
-      }
-
-      return res;
-    };
-  }
-
-  const origOpen = window.XMLHttpRequest.prototype.open;
-  const origSend = window.XMLHttpRequest.prototype.send;
-  window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-    this._url = url;
-    return origOpen.apply(this, [method, url, ...rest]);
-  };
-  window.XMLHttpRequest.prototype.send = function(...sendArgs) {
-    if (this._url && (this._url.includes('/account/status') || this._url.includes('/status'))) {
-      this.addEventListener('readystatechange', () => {
-        if (this.readyState === 4 && this.status === 200) {
-          try {
-            const data = JSON.parse(this.responseText);
-            if (data && data.result) {
-              data.result.account = { ...(data.result.account || {}), ...plusAccountData };
-              data.result.permissions = plusPermissions;
-              data.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
-              Object.defineProperty(this, 'responseText', { value: JSON.stringify(data) });
-              Object.defineProperty(this, 'response', { value: JSON.stringify(data) });
-            }
-          } catch (e) {}
-        }
-      });
-    }
-    return origSend.apply(this, sendArgs);
-  };
-} catch (err) {
-  console.warn('[PlusUnlock] Failed to install network hooks:', err);
-}
-
 const node_fs = require('node:fs');
 const node_path = require('node:path');
-const electron=require('electron');var IpcChannel = /* @__PURE__ */ ((IpcChannel2) => {
+const electron = require('electron');
+var IpcChannel = /* @__PURE__ */ ((IpcChannel2) => {
   IpcChannel2["BOOTSTRAP"] = "desktop:bootstrap";
   IpcChannel2["WINDOW_MINIMIZE"] = "desktop:window:minimize";
   IpcChannel2["WINDOW_MAXIMIZE"] = "desktop:window:maximize";
@@ -402,11 +282,136 @@ const exposeYandexModBridge = () => {
   });
 };
 
+const installApplicationMod = () => {
+  // 1. Audio element tracker
+  try {
+    window.__ymActiveAudio = null;
+    const origPlay = HTMLMediaElement.prototype.play;
+    if (origPlay) {
+      HTMLMediaElement.prototype.play = function(...args) {
+        window.__ymActiveAudio = this;
+        return origPlay.apply(this, args);
+      };
+    }
+    const origCreateEl = document.createElement.bind(document);
+    document.createElement = function(tagName, options) {
+      const el = origCreateEl(tagName, options);
+      if (tagName && String(tagName).toLowerCase() === 'audio') {
+        window.__ymActiveAudio = el;
+        el.addEventListener('play', () => { window.__ymActiveAudio = el; });
+        el.addEventListener('playing', () => { window.__ymActiveAudio = el; });
+      }
+      return el;
+    };
+  } catch (e) {}
+
+  // 2. Yandex Plus Unlocker (Strictly for music application, NEVER for passport / auth)
+  try {
+    const isAccountStatusUrl = (u) => {
+      if (!u || typeof u !== 'string') return false;
+      if (u.includes('passport.yandex') || u.includes('oauth.yandex') || u.includes('/auth/')) return false;
+      return u.includes('/account/status') || u.includes('/api/v2.1/account/status');
+    };
+
+    const plusAccountData = {
+      serviceAvailable: true,
+      hasSubscription: true,
+      hasPlus: true,
+      plus: { hasPlus: true, isAvailable: true, isTutorialCompleted: true },
+      subeditor: false,
+      subeditorLevel: 0
+    };
+
+    const plusPermissions = {
+      until: "2099-01-01T00:00:00+00:00",
+      values: [
+        "landing", "feed", "radio", "mixes", "play-audio", "play-video",
+        "play-radio", "user-music", "user-radio", "user-mixes", "user-playlists",
+        "non-stop", "high-quality", "tracks-availability", "download-tracks",
+        "premium", "lossless", "hq-audio", "offline", "skip-track", "ads-free"
+      ],
+      default: [
+        "landing", "feed", "radio", "mixes", "play-audio", "play-video",
+        "play-radio", "user-music", "user-radio", "user-mixes", "user-playlists",
+        "non-stop", "high-quality", "tracks-availability", "download-tracks",
+        "premium", "lossless", "hq-audio", "offline", "skip-track", "ads-free"
+      ]
+    };
+
+    const origFetch = window.fetch;
+    if (origFetch) {
+      window.fetch = async function(...args) {
+        const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
+        const res = await origFetch.apply(this, args);
+
+        if (isAccountStatusUrl(url)) {
+          try {
+            const clone = res.clone();
+            const json = await clone.json();
+            if (json && json.result) {
+              json.result.account = { ...(json.result.account || {}), ...plusAccountData };
+              json.result.permissions = plusPermissions;
+              json.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
+              json.result.subscription = {
+                canStartTrial: false,
+                mcdonalds: false,
+                autoRenewable: [{
+                  expires: "2099-01-01T00:00:00+00:00",
+                  vendor: "Yandex",
+                  product: { productId: "plus", type: "subscription" },
+                  finished: false
+                }],
+                hadAnySubscription: true
+              };
+              return new Response(JSON.stringify(json), {
+                status: res.status,
+                statusText: res.statusText,
+                headers: res.headers
+              });
+            }
+          } catch (e) {}
+        }
+
+        return res;
+      };
+    }
+
+    const origOpen = window.XMLHttpRequest.prototype.open;
+    const origSend = window.XMLHttpRequest.prototype.send;
+    window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+      this._url = url;
+      return origOpen.apply(this, [method, url, ...rest]);
+    };
+    window.XMLHttpRequest.prototype.send = function(...sendArgs) {
+      if (isAccountStatusUrl(this._url)) {
+        this.addEventListener('readystatechange', () => {
+          if (this.readyState === 4 && this.status === 200) {
+            try {
+              const data = JSON.parse(this.responseText);
+              if (data && data.result) {
+                data.result.account = { ...(data.result.account || {}), ...plusAccountData };
+                data.result.permissions = plusPermissions;
+                data.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
+                Object.defineProperty(this, 'responseText', { value: JSON.stringify(data) });
+                Object.defineProperty(this, 'response', { value: JSON.stringify(data) });
+              }
+            } catch (e) {}
+          }
+        });
+      }
+      return origSend.apply(this, sendArgs);
+    };
+  } catch (err) {
+    console.warn('[PlusUnlock] Failed to install network hooks:', err);
+  }
+};
+
 const exposeApplicationBridge = () => {
   const runtimeInfo = electron.ipcRenderer.sendSync(IpcChannel.BOOTSTRAP);
   if (!isDesktopRuntimeInfo(runtimeInfo)) {
     return;
   }
+  installApplicationMod();
   electron.contextBridge.exposeInMainWorld("musicDesktop", createMusicDesktopBridge(runtimeInfo));
   exposeYandexModBridge();
   window.document.addEventListener("DOMContentLoaded", () => {

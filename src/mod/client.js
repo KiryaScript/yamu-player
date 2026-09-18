@@ -82,6 +82,12 @@
       ]
     };
 
+    function isAccountStatusUrl(u) {
+      if (!u || typeof u !== 'string') return false;
+      if (u.includes('passport.yandex') || u.includes('oauth.yandex') || u.includes('/auth/')) return false;
+      return u.includes('/account/status') || u.includes('/api/v2.1/account/status');
+    }
+
     if (origFetch) {
       window.fetch = async function(...args) {
         const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
@@ -107,7 +113,7 @@
           } catch (e) {}
         }
 
-        if (url.includes('/account/status') || url.includes('/status')) {
+        if (isAccountStatusUrl(url)) {
           try {
             const clone = res.clone();
             const json = await clone.json();
@@ -150,7 +156,7 @@
       return origXhrOpen.apply(this, [method, url, ...rest]);
     };
     window.XMLHttpRequest.prototype.send = function(...sendArgs) {
-      if (this._url && (this._url.includes('/account/status') || this._url.includes('/status'))) {
+      if (this._url && isAccountStatusUrl(this._url)) {
         this.addEventListener('readystatechange', () => {
           if (this.readyState === 4 && this.status === 200) {
             try {

@@ -19,14 +19,26 @@ function initMod(mainWindow) {
       '*://mc.yandex.ru/*',
       '*://*.mc.yandex.ru/*',
       '*://an.yandex.ru/*',
-      '*://*.an.yandex.ru/*',
-      '*://clck.yandex.ru/*',
-      '*://yandex.ru/clck/*'
+      '*://*.an.yandex.ru/*'
     ];
 
     electron.session.defaultSession.webRequest.onBeforeRequest(
       { urls: blockedPatterns },
       (details, callback) => {
+        const url = details.url || '';
+        const initiator = details.initiator || '';
+        // NEVER block any passport, auth, oauth, or captcha requests!
+        if (
+          initiator.includes('passport.yandex') ||
+          initiator.includes('oauth.yandex') ||
+          initiator.includes('sso.passport') ||
+          url.includes('passport.yandex') ||
+          url.includes('oauth.yandex') ||
+          url.includes('smartcaptcha')
+        ) {
+          callback({});
+          return;
+        }
         // Block tracking, analytics and stream logs
         callback({ cancel: true });
       }
