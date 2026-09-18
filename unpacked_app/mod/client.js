@@ -1,8 +1,8 @@
-// Yandex Music Enhanced Mod - Renderer Script v2.6.5
+// Yandex Music Enhanced Mod - Renderer Script v2.6.6
 (function() {
-  console.log('[YandexMusicMod] Injecting Mod Client v2.6.5...');
+  console.log('[YandexMusicMod] Injecting Mod Client v2.6.6...');
 
-  const CURRENT_MOD_VERSION = '2.6.5';
+  const CURRENT_MOD_VERSION = '2.6.6';
   const GITHUB_CHANGELOG_URL = 'https://raw.githubusercontent.com/KiryaScript/yamu-player/refs/heads/main/CHANGELOG.md';
   const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/KiryaScript/yamu-player/refs/heads/main/version.json';
   const RELEASES_PAGE_URL = 'https://github.com/KiryaScript/yamu-player/releases/latest';
@@ -261,15 +261,53 @@
     return false;
   }
 
-  function getAudioPositionAndDuration() {
-    const audio = document.querySelector('audio');
-    if (audio) {
-      return {
-        position: isFinite(audio.currentTime) ? audio.currentTime : 0,
-        duration: isFinite(audio.duration) ? audio.duration : 0
-      };
+  function getAudioPositionAndDuration(track) {
+    let position = 0;
+    let duration = 0;
+
+    // 1. Check externalAPI.getProgress()
+    try {
+      if (window.externalAPI && typeof window.externalAPI.getProgress === 'function') {
+        const p = window.externalAPI.getProgress();
+        if (p) {
+          if (typeof p.position === 'number' && isFinite(p.position) && p.position >= 0) {
+            position = p.position;
+          }
+          if (typeof p.duration === 'number' && isFinite(p.duration) && p.duration > 0) {
+            duration = p.duration;
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 2. Fallback: Audio element in DOM
+    if (position <= 0 || duration <= 0) {
+      try {
+        const audios = document.querySelectorAll('audio');
+        for (const a of audios) {
+          if (position <= 0 && isFinite(a.currentTime) && a.currentTime > 0) {
+            position = a.currentTime;
+          }
+          if (duration <= 0 && isFinite(a.duration) && a.duration > 0) {
+            duration = a.duration;
+          }
+        }
+      } catch (e) {}
     }
-    return { position: 0, duration: 0 };
+
+    // 3. Fallback: Track metadata durationMs
+    if (duration <= 0 && track) {
+      if (typeof track.durationMs === 'number' && track.durationMs > 0) {
+        duration = track.durationMs / 1000;
+      } else if (typeof track.duration === 'number' && track.duration > 0) {
+        duration = track.duration > 1000 ? track.duration / 1000 : track.duration;
+      }
+    }
+
+    return {
+      position: Math.max(0, position),
+      duration: Math.max(0, duration)
+    };
   }
 
   function getTrackFromExternalApi() {
@@ -745,27 +783,37 @@
   function initDiscordRpcSync() {
     let lastTrackKey = null;
     let lastPlaying = null;
+    let lastPosition = 0;
+    let lastUpdateTimestamp = 0;
 
     setInterval(() => {
       if (!settings.discordRpcEnabled || !window.yandexMod?.updatePlayerState) return;
 
       const isPlaying = isPlayerPlaying();
       const track = getCurrentPlayingTrack();
-      const { position, duration } = getAudioPositionAndDuration();
+      const { position, duration } = getAudioPositionAndDuration(track);
 
       if (!track || !isPlaying) {
         if (lastPlaying) {
           window.yandexMod.updatePlayerState(null);
           lastPlaying = false;
           lastTrackKey = null;
+          lastPosition = 0;
+          lastUpdateTimestamp = 0;
         }
         return;
       }
 
-      const trackKey = `${track.id || track.title}:${track.artists?.[0]?.name}:${isPlaying}`;
-      if (trackKey !== lastTrackKey || isPlaying !== lastPlaying) {
+      const trackKey = `${track.id || track.title}:${track.artists?.[0]?.name || ''}`;
+      const now = Date.now();
+      const expectedPosition = lastPosition + ((now - lastUpdateTimestamp) / 1000);
+      const hasSeeked = Math.abs(position - expectedPosition) > 3;
+
+      if (trackKey !== lastTrackKey || isPlaying !== lastPlaying || hasSeeked) {
         lastTrackKey = trackKey;
         lastPlaying = isPlaying;
+        lastPosition = position;
+        lastUpdateTimestamp = now;
 
         window.yandexMod.updatePlayerState({
           isPlaying: true,
@@ -773,7 +821,7 @@
           position,
           duration
         });
-        console.log('[DiscordRPC] Sent player state update:', track.title, 'by', track.artists?.[0]?.name);
+        console.log('[DiscordRPC] Sent player state update:', track.title, 'by', track.artists?.[0]?.name, `(${position.toFixed(0)}s/${duration.toFixed(0)}s)`);
       }
     }, 1000);
   }
@@ -2209,7 +2257,7 @@ ${updateInfo.changelog}
       checkForModUpdates(false);
     }, 3500);
 
-    console.log('[YandexMusicMod] Mod Client v2.6.5 initialized successfully.');
+    console.log('[YandexMusicMod] Mod Client v2.6.6 initialized successfully.');
   }
 
   if (document.readyState === 'loading') {

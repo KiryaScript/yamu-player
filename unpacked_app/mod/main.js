@@ -212,28 +212,37 @@ function initMod(mainWindow) {
     }
 
     const { track, position = 0, duration = 0 } = state;
-    const artists = (track.artists || []).map(a => a.name || a).join(', ') || 'Unknown Artist';
-    const title = track.title || 'Unknown Title';
+    const artists = (track.artists || []).map(a => a.name || a).join(', ') || 'Неизвестный исполнитель';
+    const title = track.title || 'Без названия';
     const album = track.albums?.[0]?.title || '';
 
     const nowMs = Date.now();
-    const startTimestamp = Math.floor(nowMs - (position * 1000));
-    const endTimestamp = duration > 0 ? Math.floor(startTimestamp + (duration * 1000)) : undefined;
+    const posSec = Math.max(0, position);
+    const durSec = Math.max(0, duration || (track.durationMs ? track.durationMs / 1000 : 0));
+
+    const startTimestamp = Math.floor(nowMs - (posSec * 1000));
+    const endTimestamp = durSec > 0 ? Math.floor(startTimestamp + (durSec * 1000)) : undefined;
 
     let coverUrl = 'https://cdn.rcd.gg/PreMiD/websites/Y/Yandex%20Music/assets/logo.png';
     if (track.coverUri) {
       coverUrl = track.coverUri.startsWith('http') ? track.coverUri : `https://${track.coverUri.replace('%%', '400x400')}`;
     }
 
+    const isSingle = album && album.trim().toLowerCase() === title.trim().toLowerCase();
+    const stateText = `от ${artists}` + (album && !isSingle ? ` • ${album}` : '');
+
     const activityPayload = {
+      type: 2,
       details: String(title).slice(0, 128),
-      state: String(`от ${artists}` + (album ? ` • ${album}` : '')).slice(0, 128),
+      state: String(stateText).slice(0, 128),
       timestamps: {
         start: startTimestamp
       },
       assets: {
         large_image: coverUrl,
-        large_text: String(album || title || 'Яндекс Музыка').slice(0, 128)
+        large_text: String(album ? `Альбом: ${album}` : (title || 'Яндекс Музыка')).slice(0, 128),
+        small_image: 'https://music.yandex.ru/favicon.png',
+        small_text: 'Яндекс Музыка'
       }
     };
 
@@ -243,7 +252,7 @@ function initMod(mainWindow) {
 
     if (track.id) {
       activityPayload.buttons = [
-        { label: 'Слушать трек', url: `https://music.yandex.ru/track/${track.id}` }
+        { label: 'Слушать в Яндекс Музыке', url: `https://music.yandex.ru/track/${track.id}` }
       ];
     }
 
