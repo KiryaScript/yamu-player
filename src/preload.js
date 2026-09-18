@@ -1,6 +1,30 @@
 'use strict';
 
 // ---------------------------------------------------------
+// GLOBAL AUDIO ELEMENT TRACKER FOR DISCORD RPC & PLAYER
+// ---------------------------------------------------------
+try {
+  window.__ymActiveAudio = null;
+  const origPlay = HTMLMediaElement.prototype.play;
+  if (origPlay) {
+    HTMLMediaElement.prototype.play = function(...args) {
+      window.__ymActiveAudio = this;
+      return origPlay.apply(this, args);
+    };
+  }
+  const origCreateEl = document.createElement.bind(document);
+  document.createElement = function(tagName, options) {
+    const el = origCreateEl(tagName, options);
+    if (tagName && String(tagName).toLowerCase() === 'audio') {
+      window.__ymActiveAudio = el;
+      el.addEventListener('play', () => { window.__ymActiveAudio = el; });
+      el.addEventListener('playing', () => { window.__ymActiveAudio = el; });
+    }
+    return el;
+  };
+} catch (e) {}
+
+// ---------------------------------------------------------
 // YANDEX PLUS SUBSCRIPTION UNLOCKER (PRO FEATURES & HQ AUDIO)
 // ---------------------------------------------------------
 try {
@@ -96,9 +120,40 @@ try {
   console.warn('[PlusUnlock] Failed to install network hooks:', err);
 }
 
-const electron=require('electron'),uuid=require('uuid'),Store=require('electron-store'),node_crypto=require('node:crypto'),node_os=require('node:os');const appConfig={appHostname:"desktop"};const buildInfo={VERSION:"5.116.3",BRANCH:"9514e66969bd27e00a6f2403bbaf4675da866692"};const config = {
-  app: appConfig,
-  buildInfo};var StorageKeys = /* @__PURE__ */ ((StorageKeys2) => {
+const node_fs = require('node:fs');
+const node_path = require('node:path');
+const electron=require('electron');var IpcChannel = /* @__PURE__ */ ((IpcChannel2) => {
+  IpcChannel2["BOOTSTRAP"] = "desktop:bootstrap";
+  IpcChannel2["WINDOW_MINIMIZE"] = "desktop:window:minimize";
+  IpcChannel2["WINDOW_MAXIMIZE"] = "desktop:window:maximize";
+  IpcChannel2["WINDOW_CLOSE"] = "desktop:window:close";
+  IpcChannel2["COMMON_WINDOW_CLOSE"] = "desktop:common:window:close";
+  IpcChannel2["INSTALL_UPDATE"] = "desktop:application:install-update";
+  IpcChannel2["APPLICATION_READY"] = "desktop:application:ready";
+  IpcChannel2["APPLICATION_THEME"] = "desktop:application:theme";
+  IpcChannel2["AUTH_DIAGNOSTIC"] = "desktop:authorization:diagnostic";
+  IpcChannel2["GET_PASSPORT_LOGIN"] = "desktop:authorization:get-passport-login";
+  IpcChannel2["GET_YANDEX_UID"] = "desktop:authorization:get-yandex-uid";
+  IpcChannel2["UPDATE_AVAILABLE"] = "desktop:application:update-available";
+  IpcChannel2["REFRESH_APPLICATION_DATA"] = "desktop:application:refresh-data";
+  IpcChannel2["FIRST_LAUNCH"] = "desktop:application:first-launch";
+  IpcChannel2["PROBABILITY_BUCKET"] = "desktop:application:probability-bucket";
+  IpcChannel2["LOAD_RELEASE_NOTES"] = "desktop:application:load-release-notes";
+  IpcChannel2["PLAYER_STATE"] = "desktop:player:state";
+  IpcChannel2["PLAYER_ACTION"] = "desktop:player:action";
+  IpcChannel2["OPEN_DEEPLINK"] = "desktop:navigation:open-deeplink";
+  IpcChannel2["TRACKS_AVAILABILITY_UPDATED"] = "desktop:offline:tracks-availability-updated";
+  IpcChannel2["REPOSITORY_META_UPDATED"] = "desktop:offline:repository-meta-updated";
+  IpcChannel2["REFRESH_TRACKS_AVAILABILITY"] = "desktop:offline:refresh-tracks-availability";
+  IpcChannel2["REFRESH_REPOSITORY_META"] = "desktop:offline:refresh-repository-meta";
+  IpcChannel2["SAVE_PNG_IMAGE_TO_LOCAL_DISK"] = "desktop:files:save-png";
+  return IpcChannel2;
+})(IpcChannel || {});var RendererTrustProfile = /* @__PURE__ */ ((RendererTrustProfile2) => {
+  RendererTrustProfile2["APPLICATION"] = "application";
+  RendererTrustProfile2["AUTH"] = "auth";
+  RendererTrustProfile2["UNTRUSTED"] = "untrusted";
+  return RendererTrustProfile2;
+})(RendererTrustProfile || {});var StorageKeys = /* @__PURE__ */ ((StorageKeys2) => {
   StorageKeys2["Theme"] = "theme";
   return StorageKeys2;
 })(StorageKeys || {});var Theme = /* @__PURE__ */ ((Theme2) => {
@@ -132,195 +187,251 @@ const getInitialTheme = () => {
     default:
       return getSystemTheme();
   }
-};const UNIVERSAL_DIGIT_REGEX = /[014589cd]/;
-const ZERO_MAC_REGEX = /(?:[0]{1,2}[:-]){5}[0]{1,2}/;
-const isGloballyUniqueMacAddress = (mac) => {
-  const digit = mac[1];
-  if (!digit) {
+};/** Причины, по которым URL не прошёл настроенную политику. */
+var UrlPolicyRejectionReason;
+(function (UrlPolicyRejectionReason) {
+    UrlPolicyRejectionReason["INVALID_URL"] = "invalid-url";
+    UrlPolicyRejectionReason["DISALLOWED_PROTOCOL"] = "disallowed-protocol";
+    UrlPolicyRejectionReason["CREDENTIALS_NOT_ALLOWED"] = "credentials-not-allowed";
+})(UrlPolicyRejectionReason || (UrlPolicyRejectionReason = {}));/**
+ * Разбирает URL и применяет политику, настроенную в месте целевого действия.
+ *
+ * Функция использует WHATWG URL, поэтому нормализация регистра протокола и
+ * управляющих ASCII-символов совпадает с поведением браузера и Electron.
+ * Исходная строка не возвращается при отказе, чтобы случайно не записать в лог
+ * credentials, query-параметры или fragment.
+ */
+const resolveUrlByPolicy = (value, config) => {
+    let url;
+    try {
+        url = typeof config.baseUrl === 'undefined' ? new URL(value) : new URL(value, config.baseUrl);
+    }
+    catch {
+        return {
+            isAllowed: false,
+            reason: UrlPolicyRejectionReason.INVALID_URL,
+        };
+    }
+    if (!config.allowedProtocols.has(url.protocol)) {
+        return {
+            isAllowed: false,
+            reason: UrlPolicyRejectionReason.DISALLOWED_PROTOCOL,
+        };
+    }
+    if (!config.allowCredentials && (url.username !== '' || url.password !== '')) {
+        return {
+            isAllowed: false,
+            reason: UrlPolicyRejectionReason.CREDENTIALS_NOT_ALLOWED,
+        };
+    }
+    return {
+        isAllowed: true,
+        url,
+    };
+};/** Стандартные URL-протоколы, которые могут использовать локальные политики потребителей. */
+var UrlProtocol;
+(function (UrlProtocol) {
+    UrlProtocol["HTTP"] = "http:";
+    UrlProtocol["HTTPS"] = "https:";
+    UrlProtocol["MAILTO"] = "mailto:";
+    UrlProtocol["TEL"] = "tel:";
+})(UrlProtocol || (UrlProtocol = {}));const appConfig={appProtocol:"music-application",appHostname:"desktop"};const config = {
+  app: appConfig};const DESKTOP_APPLICATION_URL = `${config.app.appProtocol}://${config.app.appHostname}`;
+const DESKTOP_APPLICATION_PROTOCOL = new URL(DESKTOP_APPLICATION_URL).protocol;const SUPPORTED_TLDS = ["ru", "com", "kz", "by", "uz"];const TLD_PATTERN = `(?:${SUPPORTED_TLDS.join("|")})`;
+const isApplicationHostname = (hostname) => {
+  return hostname === config.app.appHostname;
+};
+const oAuthHostnamePattern = new RegExp(`^oauth\\.yandex\\.${TLD_PATTERN}$`);
+const passportYandexHostnamePattern = new RegExp(`^passport\\.yandex\\.${TLD_PATTERN}$`);
+const ssoPassportYandexHostnamePattern = new RegExp(
+  `^sso\\.passport\\.yandex\\.${TLD_PATTERN}$`
+);
+const ssoPassportYaHostnamePattern = new RegExp(`^sso\\.ya\\.${TLD_PATTERN}$`);
+const AUTH_HOSTNAME_PATTERNS = [
+  oAuthHostnamePattern,
+  passportYandexHostnamePattern,
+  ssoPassportYandexHostnamePattern,
+  ssoPassportYaHostnamePattern
+];const RENDERER_URL_POLICY = {
+  allowedProtocols: /* @__PURE__ */ new Set([DESKTOP_APPLICATION_PROTOCOL, UrlProtocol.HTTPS])
+};
+const classifyRendererUrl = (rawUrl) => {
+  const result = resolveUrlByPolicy(rawUrl, RENDERER_URL_POLICY);
+  if (!result.isAllowed || result.url.port !== "") {
+    return RendererTrustProfile.UNTRUSTED;
+  }
+  const { url } = result;
+  if (url.protocol === DESKTOP_APPLICATION_PROTOCOL && isApplicationHostname(url.hostname)) {
+    return RendererTrustProfile.APPLICATION;
+  }
+  if (url.protocol === UrlProtocol.HTTPS && AUTH_HOSTNAME_PATTERNS.some((pattern) => pattern.test(url.hostname))) {
+    return RendererTrustProfile.AUTH;
+  }
+  return RendererTrustProfile.UNTRUSTED;
+};const isRecord = (value) => {
+  return typeof value === "object" && value !== null;
+};const isDesktopRuntimeInfo = (value) => {
+  if (!isRecord(value) || !isRecord(value.deviceInfo)) {
     return false;
   }
-  return UNIVERSAL_DIGIT_REGEX.test(digit.toLowerCase());
-};
-const getMac = () => {
-  for (const config of Object.values(node_os.networkInterfaces())) {
-    if (!config) {
-      continue;
-    }
-    for (const iface of config) {
-      if (ZERO_MAC_REGEX.test(iface.mac)) {
-        continue;
-      }
-      if (isGloballyUniqueMacAddress(iface.mac)) {
-        return iface.mac;
-      }
-    }
-  }
-  return;
-};
-const generateDeviceId = () => {
-  const data = [node_os.hostname(), node_os.platform(), node_os.machine(), node_os.totalmem(), getMac()].join();
-  return node_crypto.createHash("sha256").update(data).digest("hex");
-};var StoreKeys = /* @__PURE__ */ ((StoreKeys2) => {
-  StoreKeys2["VERSION"] = "version";
-  StoreKeys2["HAS_RECENTLY_LAUNCHED"] = "hasRecentlyLaunched";
-  StoreKeys2["UUID"] = "uuid";
-  StoreKeys2["DEVICE_ID"] = "deviceId";
-  StoreKeys2["DEVICE_SOFTWARE_REVISION"] = "deviceSoftwareRevision";
-  StoreKeys2["DEVICE_CPU_REVISION"] = "deviceCpuRevision";
-  StoreKeys2["TRACKS_AVAILABILITY_UPDATED_AT"] = "tracksAvailabilityUpdatedAt";
-  StoreKeys2["REPOSITORY_META_UPDATED_AT"] = "repositoryMetaUpdatedAt";
-  return StoreKeys2;
-})(StoreKeys || {});const store = new Store();
-const useCachedValue = (key) => {
-  let cachedValue = null;
-  const get = () => {
-    if (cachedValue) {
-      return cachedValue;
-    }
-    cachedValue = store.get(key);
-    return cachedValue;
+  const { deviceInfo } = value;
+  return typeof value.version === "string" && typeof value.branch === "string" && (value.platform === "darwin" || value.platform === "win32" || value.platform === "linux") && typeof value.deviceHostname === "string" && typeof deviceInfo.manufacturer === "string" && typeof deviceInfo.model === "string" && typeof deviceInfo.uuid === "string" && typeof deviceInfo.os === "string" && typeof deviceInfo.os_version === "string" && typeof deviceInfo.device_id === "string" && typeof deviceInfo.clid === "number";
+};const subscribe = (channel, listener) => {
+  const wrappedListener = (_event, ...args) => {
+    listener(...args);
   };
-  const set = (value) => {
-    cachedValue = value;
-    store.set(key, value);
+  electron.ipcRenderer.on(channel, wrappedListener);
+  return () => {
+    electron.ipcRenderer.removeListener(channel, wrappedListener);
   };
-  return [get, set];
 };
-const getUuid = () => {
-  let uuid$1 = store.get(StoreKeys.UUID);
-  if (!uuid$1) {
-    uuid$1 = uuid.v4();
-    store.set(StoreKeys.UUID, uuid$1);
-  }
-  return uuid$1;
-};
-const deviceId = useCachedValue(StoreKeys.DEVICE_ID);
-const getDeviceId = () => {
-  const [get, set] = deviceId;
-  let deviceIdValue = get();
-  if (deviceIdValue) {
-    return String(deviceIdValue);
-  }
-  deviceIdValue = generateDeviceId();
-  set(deviceIdValue);
-  return String(deviceIdValue);
-};const devicePlatform = node_os.platform();const getDeviceInfo = () => {
-  return {
-    manufacturer: "",
-    model: "",
-    uuid: getUuid(),
-    os: devicePlatform,
-    os_version: "",
-    device_id: getDeviceId(),
-    clid: 0
-  };
-};const getDeviceHostname = () => {
-  return node_os.hostname().slice(0, 50).trim();
-};const isApplicationHostname = (hostname) => {
-  return hostname === config.app.appHostname;
-};const deviceInfo = getDeviceInfo();
-electron.contextBridge.exposeInMainWorld("VERSION", String(config.buildInfo.VERSION));
-electron.contextBridge.exposeInMainWorld("BRANCH", String(config.buildInfo.BRANCH));
-electron.contextBridge.exposeInMainWorld("PLATFORM", deviceInfo.os);
-electron.contextBridge.exposeInMainWorld("DEVICE_INFO", deviceInfo);
-electron.contextBridge.exposeInMainWorld("DEVICE_HOSTNAME", getDeviceHostname());
-electron.contextBridge.exposeInMainWorld("desktopEvents", {
-  send(name, ...args) {
-    electron.ipcRenderer.send(name, ...args);
+const createMusicDesktopBridge = (runtime) => ({
+  runtime,
+  window: {
+    minimize: () => electron.ipcRenderer.send(IpcChannel.WINDOW_MINIMIZE),
+    maximize: () => electron.ipcRenderer.send(IpcChannel.WINDOW_MAXIMIZE),
+    close: () => electron.ipcRenderer.send(IpcChannel.WINDOW_CLOSE)
   },
-  on(name, listener) {
-    electron.ipcRenderer.on(name, listener);
+  app: {
+    ready: (language) => electron.ipcRenderer.send(IpcChannel.APPLICATION_READY, language),
+    setTheme: (theme) => electron.ipcRenderer.send(IpcChannel.APPLICATION_THEME, theme),
+    installUpdate: () => electron.ipcRenderer.send(IpcChannel.INSTALL_UPDATE),
+    onUpdateAvailable: (listener) => subscribe(IpcChannel.UPDATE_AVAILABLE, listener),
+    onRefreshData: (listener) => subscribe(IpcChannel.REFRESH_APPLICATION_DATA, listener),
+    onFirstLaunch: (listener) => subscribe(IpcChannel.FIRST_LAUNCH, listener),
+    onProbabilityBucket: (listener) => subscribe(IpcChannel.PROBABILITY_BUCKET, listener),
+    onLoadReleaseNotes: (listener) => subscribe(IpcChannel.LOAD_RELEASE_NOTES, listener)
   },
-  off(name, listener) {
-    electron.ipcRenderer.off(name, listener);
+  authorization: {
+    getPassportLogin: () => electron.ipcRenderer.invoke(IpcChannel.GET_PASSPORT_LOGIN),
+    getYandexUid: () => electron.ipcRenderer.invoke(IpcChannel.GET_YANDEX_UID),
+    reportDiagnostic: (payload) => electron.ipcRenderer.send(IpcChannel.AUTH_DIAGNOSTIC, payload)
   },
-  invoke(name, ...args) {
-    return electron.ipcRenderer.invoke(name, ...args);
+  player: {
+    reportState: (state) => electron.ipcRenderer.send(IpcChannel.PLAYER_STATE, state),
+    onAction: (listener) => subscribe(IpcChannel.PLAYER_ACTION, listener)
+  },
+  navigation: {
+    onOpenDeeplink: (listener) => subscribe(IpcChannel.OPEN_DEEPLINK, listener)
+  },
+  offline: {
+    notifyTracksAvailabilityUpdated: () => electron.ipcRenderer.send(IpcChannel.TRACKS_AVAILABILITY_UPDATED),
+    notifyRepositoryMetaUpdated: () => electron.ipcRenderer.send(IpcChannel.REPOSITORY_META_UPDATED),
+    onRefreshTracksAvailability: (listener) => subscribe(IpcChannel.REFRESH_TRACKS_AVAILABILITY, listener),
+    onRefreshRepositoryMeta: (listener) => subscribe(IpcChannel.REFRESH_REPOSITORY_META, listener)
+  },
+  files: {
+    savePng: (defaultPath, buffer) => electron.ipcRenderer.send(IpcChannel.SAVE_PNG_IMAGE_TO_LOCAL_DISK, { defaultPath, buffer })
   }
 });
+const exposeYandexModBridge = () => {
+  electron.contextBridge.exposeInMainWorld("yandexMod", {
+    getSettings: () => electron.ipcRenderer.invoke('mod:get-settings'),
+    saveSettings: (s) => electron.ipcRenderer.invoke('mod:save-settings', s),
+    selectFolder: () => electron.ipcRenderer.invoke('mod:select-download-folder'),
+    openFolder: () => electron.ipcRenderer.invoke('mod:open-download-folder'),
+    downloadTrack: (track) => electron.ipcRenderer.invoke('mod:download-track', track),
+    downloadAlbum: (albumId) => electron.ipcRenderer.invoke('mod:download-album', albumId),
+    downloadPlaylist: (playlistData) => electron.ipcRenderer.invoke('mod:download-playlist', playlistData),
+    cancelDownload: () => electron.ipcRenderer.invoke('mod:cancel-download'),
+    getInstallType: () => electron.ipcRenderer.invoke('mod:get-install-type'),
+    exportBackup: (format, clientTracks) => electron.ipcRenderer.invoke('mod:export-backup', format, clientTracks),
+    exportPlaylist: (playlistData, format) => electron.ipcRenderer.invoke('mod:export-playlist', playlistData, format),
+    getUserPlaylists: () => electron.ipcRenderer.invoke('mod:get-user-playlists'),
+    createPlaylist: (title) => electron.ipcRenderer.invoke('mod:create-playlist', title),
+    getCurrentUser: () => electron.ipcRenderer.invoke('mod:get-current-user'),
+    restoreBackup: (options) => electron.ipcRenderer.invoke('mod:restore-backup', options),
+    getBackupCount: () => electron.ipcRenderer.invoke('mod:get-backup-count'),
+    toggleDevTools: () => electron.ipcRenderer.invoke('mod:toggle-devtools'),
+    updatePlayerState: (state) => electron.ipcRenderer.send('mod:update-player-state', state),
+    
+    onTogglePanel: (cb) => {
+      const handler = () => cb();
+      electron.ipcRenderer.on('mod:toggle-panel', handler);
+      return () => electron.ipcRenderer.removeListener('mod:toggle-panel', handler);
+    },
+    onQuickDownload: (cb) => {
+      const handler = () => cb();
+      electron.ipcRenderer.on('mod:quick-download', handler);
+      return () => electron.ipcRenderer.removeListener('mod:quick-download', handler);
+    },
+    onDownloadProgress: (cb) => {
+      const handler = (_, p) => cb(p);
+      electron.ipcRenderer.on('mod:download-progress', handler);
+      return () => electron.ipcRenderer.removeListener('mod:download-progress', handler);
+    },
+    onDownloadCompleted: (cb) => {
+      const handler = (_, r) => cb(r);
+      electron.ipcRenderer.on('mod:download-completed', handler);
+      return () => electron.ipcRenderer.removeListener('mod:download-completed', handler);
+    },
+    onRestoreProgress: (cb) => {
+      const handler = (_, r) => cb(r);
+      electron.ipcRenderer.on('mod:restore-progress', handler);
+      return () => electron.ipcRenderer.removeListener('mod:restore-progress', handler);
+    },
+    onDownloadError: (cb) => {
+      const handler = (_, e) => cb(e);
+      electron.ipcRenderer.on('mod:download-error', handler);
+      return () => electron.ipcRenderer.removeListener('mod:download-error', handler);
+    }
+  });
 
-// Mod IPC Bridge
-electron.contextBridge.exposeInMainWorld("yandexMod", {
-  getSettings: () => electron.ipcRenderer.invoke('mod:get-settings'),
-  saveSettings: (s) => electron.ipcRenderer.invoke('mod:save-settings', s),
-  selectFolder: () => electron.ipcRenderer.invoke('mod:select-download-folder'),
-  openFolder: () => electron.ipcRenderer.invoke('mod:open-download-folder'),
-  downloadTrack: (track) => electron.ipcRenderer.invoke('mod:download-track', track),
-  downloadAlbum: (albumId) => electron.ipcRenderer.invoke('mod:download-album', albumId),
-  downloadPlaylist: (playlistData) => electron.ipcRenderer.invoke('mod:download-playlist', playlistData),
-  cancelDownload: () => electron.ipcRenderer.invoke('mod:cancel-download'),
-  getInstallType: () => electron.ipcRenderer.invoke('mod:get-install-type'),
-  exportBackup: (format, clientTracks) => electron.ipcRenderer.invoke('mod:export-backup', format, clientTracks),
-  exportPlaylist: (playlistData, format) => electron.ipcRenderer.invoke('mod:export-playlist', playlistData, format),
-  getUserPlaylists: () => electron.ipcRenderer.invoke('mod:get-user-playlists'),
-  createPlaylist: (title) => electron.ipcRenderer.invoke('mod:create-playlist', title),
-  getCurrentUser: () => electron.ipcRenderer.invoke('mod:get-current-user'),
-  restoreBackup: (options) => electron.ipcRenderer.invoke('mod:restore-backup', options),
-  getBackupCount: () => electron.ipcRenderer.invoke('mod:get-backup-count'),
-  toggleDevTools: () => electron.ipcRenderer.invoke('mod:toggle-devtools'),
-  updatePlayerState: (state) => electron.ipcRenderer.send('mod:update-player-state', state),
-  
-  onTogglePanel: (cb) => {
-    const handler = () => cb();
-    electron.ipcRenderer.on('mod:toggle-panel', handler);
-    return () => electron.ipcRenderer.removeListener('mod:toggle-panel', handler);
-  },
-  onQuickDownload: (cb) => {
-    const handler = () => cb();
-    electron.ipcRenderer.on('mod:quick-download', handler);
-    return () => electron.ipcRenderer.removeListener('mod:quick-download', handler);
-  },
-  onDownloadProgress: (cb) => {
-    const handler = (_, p) => cb(p);
-    electron.ipcRenderer.on('mod:download-progress', handler);
-    return () => electron.ipcRenderer.removeListener('mod:download-progress', handler);
-  },
-  onDownloadCompleted: (cb) => {
-    const handler = (_, r) => cb(r);
-    electron.ipcRenderer.on('mod:download-completed', handler);
-    return () => electron.ipcRenderer.removeListener('mod:download-completed', handler);
-  },
-  onRestoreProgress: (cb) => {
-    const handler = (_, r) => cb(r);
-    electron.ipcRenderer.on('mod:restore-progress', handler);
-    return () => electron.ipcRenderer.removeListener('mod:restore-progress', handler);
-  },
-  onDownloadError: (cb) => {
-    const handler = (_, e) => cb(e);
-    electron.ipcRenderer.on('mod:download-error', handler);
-    return () => electron.ipcRenderer.removeListener('mod:download-error', handler);
+  window.document.addEventListener("DOMContentLoaded", () => {
+    try {
+      const cssPath = node_path.join(__dirname, 'mod', 'client.css');
+      if (node_fs.existsSync(cssPath)) {
+        const cssContent = node_fs.readFileSync(cssPath, 'utf8');
+        const styleEl = document.createElement('style');
+        styleEl.id = 'ym-mod-injected-styles';
+        styleEl.textContent = cssContent;
+        document.head.appendChild(styleEl);
+      }
+
+      const jsPath = node_path.join(__dirname, 'mod', 'client.js');
+      if (node_fs.existsSync(jsPath)) {
+        const jsContent = node_fs.readFileSync(jsPath, 'utf8');
+        const scriptEl = document.createElement('script');
+        scriptEl.id = 'ym-mod-injected-script';
+        scriptEl.textContent = jsContent;
+        document.body.appendChild(scriptEl);
+      }
+    } catch (err) {
+      console.error('[Preload] Failed to inject Mod client:', err);
+    }
+  });
+};
+
+const exposeApplicationBridge = () => {
+  const runtimeInfo = electron.ipcRenderer.sendSync(IpcChannel.BOOTSTRAP);
+  if (!isDesktopRuntimeInfo(runtimeInfo)) {
+    return;
   }
-});
-
-const node_fs = require('node:fs');
-const node_path = require('node:path');
-
-window.document.addEventListener("DOMContentLoaded", () => {
-  const theme = getInitialTheme();
-  if (isApplicationHostname(window.location.hostname)) {
+  electron.contextBridge.exposeInMainWorld("musicDesktop", createMusicDesktopBridge(runtimeInfo));
+  exposeYandexModBridge();
+  window.document.addEventListener("DOMContentLoaded", () => {
+    const theme = getInitialTheme();
     window.document.documentElement.style.backgroundColor = theme === Theme.Light ? "#FFFFFF" : "#000000";
-  }
-
-  // Inject Mod Styles and Client Script Safely
-  try {
-    const cssPath = node_path.join(__dirname, 'mod', 'client.css');
-    if (node_fs.existsSync(cssPath)) {
-      const cssContent = node_fs.readFileSync(cssPath, 'utf8');
-      const styleEl = document.createElement('style');
-      styleEl.id = 'ym-mod-injected-styles';
-      styleEl.textContent = cssContent;
-      document.head.appendChild(styleEl);
+  });
+};
+const exposeCommonBridge = () => {
+  const bridge = {
+    window: {
+      close: () => electron.ipcRenderer.send(IpcChannel.COMMON_WINDOW_CLOSE)
     }
-
-    const jsPath = node_path.join(__dirname, 'mod', 'client.js');
-    if (node_fs.existsSync(jsPath)) {
-      const jsContent = node_fs.readFileSync(jsPath, 'utf8');
-      const scriptEl = document.createElement('script');
-      scriptEl.id = 'ym-mod-injected-script';
-      scriptEl.textContent = jsContent;
-      document.body.appendChild(scriptEl);
-    }
-  } catch (err) {
-    console.error('[Preload] Failed to inject Mod client:', err);
+  };
+  electron.contextBridge.exposeInMainWorld("musicDesktopCommon", bridge);
+};
+const exposeBridge = () => {
+  if (window !== window.top) {
+    return;
   }
-});
+  const profile = classifyRendererUrl(window.location.href);
+  if (profile === RendererTrustProfile.APPLICATION) {
+    exposeApplicationBridge();
+  }
+  if (profile === RendererTrustProfile.AUTH) {
+    exposeCommonBridge();
+  }
+};
+exposeBridge();

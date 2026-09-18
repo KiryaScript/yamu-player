@@ -1,9 +1,9 @@
 {
-  "version": "2.6.6",
-  "appVersion": "5.116.3",
+  "version": "2.7.0",
+  "appVersion": "5.120.0",
   "mandatory": false,
-  "title": "Spotify-стиль в Discord: статус «Слушает» и таймлайн",
-  "changelog": "• Отображение активности в Discord в стиле Spotify: статус «Слушает Yandex Music» вместо «Играет в»\n• Полноценный прогресс-бар и таймлайн трека (текущее время, общая длительность, синхронизация при перемотке)\n• Убран значок геймпада, добавлен аккуратный бейдж сервиса на обложку\n• Кнопка прямого перехода «Слушать в Яндекс Музыке»",
+  "title": "Обновление до Яндекс Музыки 5.120.0 + Spotify-стиль в Discord",
+  "changelog": "• Полная адаптация и поддержка новой версии Яндекс Музыки 5.120.0\n• Поддержка обновлённой архитектуры IPC и Renderer Bridge (musicDesktop)\n• Статус в Discord в стиле Spotify («Слушает Yandex Music»)\n• Точный прогресс-бар и синхронизация времени трека в Discord",
   "patcherUrl": "https://github.com/KiryaScript/yamu-player/releases/latest",
   "portableUrl": "https://github.com/KiryaScript/yamu-player/releases/latest"
 }

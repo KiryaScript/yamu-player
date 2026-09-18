@@ -1,8 +1,8 @@
-// Yandex Music Enhanced Mod - Renderer Script v2.6.6
+// Yandex Music Enhanced Mod - Renderer Script v2.7.0
 (function() {
-  console.log('[YandexMusicMod] Injecting Mod Client v2.6.6...');
+  console.log('[YandexMusicMod] Injecting Mod Client v2.7.0...');
 
-  const CURRENT_MOD_VERSION = '2.6.6';
+  const CURRENT_MOD_VERSION = '2.7.0';
   const GITHUB_CHANGELOG_URL = 'https://raw.githubusercontent.com/KiryaScript/yamu-player/refs/heads/main/CHANGELOG.md';
   const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/KiryaScript/yamu-player/refs/heads/main/version.json';
   const RELEASES_PAGE_URL = 'https://github.com/KiryaScript/yamu-player/releases/latest';
@@ -28,6 +28,30 @@
   window.__ymModGetRecentTrackHistory = () => _recentTrackHistory;
   window.__ymModGetTrackMetaCache = () => _trackMetaCache;
   window.__ymModSafeFetch = safeFetch;
+
+  // ---------------------------------------------------------
+  // 0. MAIN-WORLD AUDIO ELEMENT TRACKER (FOR DISCORD RPC & PLAYER)
+  // ---------------------------------------------------------
+  try {
+    window.__ymActiveAudio = window.__ymActiveAudio || null;
+    const origPlay = HTMLMediaElement.prototype.play;
+    if (origPlay) {
+      HTMLMediaElement.prototype.play = function(...args) {
+        window.__ymActiveAudio = this;
+        return origPlay.apply(this, args);
+      };
+    }
+    const origCreateEl = document.createElement.bind(document);
+    document.createElement = function(tagName, options) {
+      const el = origCreateEl(tagName, options);
+      if (tagName && String(tagName).toLowerCase() === 'audio') {
+        window.__ymActiveAudio = el;
+        el.addEventListener('play', () => { window.__ymActiveAudio = el; });
+        el.addEventListener('playing', () => { window.__ymActiveAudio = el; });
+      }
+      return el;
+    };
+  } catch (e) {}
 
   // ---------------------------------------------------------
   // 1. MAIN-WORLD YANDEX PLUS UNLOCKER (UNLIMITED PLAYBACK & HQ)
