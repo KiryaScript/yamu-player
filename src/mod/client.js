@@ -85,7 +85,7 @@
     function isAccountStatusUrl(u) {
       if (!u || typeof u !== 'string') return false;
       if (u.includes('passport.yandex') || u.includes('oauth.yandex') || u.includes('/auth/')) return false;
-      return u.includes('/account/status') || u.includes('/api/v2.1/account/status');
+      return u.includes('/account/status') || u.includes('/api/v2.1/account/status') || u.includes('account/about') || u.includes('/account/about');
     }
 
     if (origFetch) {
@@ -117,21 +117,29 @@
           try {
             const clone = res.clone();
             const json = await clone.json();
-            if (json && json.result) {
-              json.result.account = { ...(json.result.account || {}), ...plusData };
-              json.result.permissions = plusPerms;
-              json.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
-              json.result.subscription = {
-                canStartTrial: false,
-                mcdonalds: false,
-                autoRenewable: [{
-                  expires: "2099-01-01T00:00:00+00:00",
-                  vendor: "Yandex",
-                  product: { productId: "plus", type: "subscription" },
-                  finished: false
-                }],
-                hadAnySubscription: true
-              };
+            if (json) {
+              if (json.result) {
+                json.result.account = { ...(json.result.account || {}), ...plusData };
+                json.result.permissions = plusPerms;
+                json.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
+                json.result.subscription = {
+                  canStartTrial: false,
+                  mcdonalds: false,
+                  autoRenewable: [{
+                    expires: "2099-01-01T00:00:00+00:00",
+                    vendor: "Yandex",
+                    product: { productId: "plus", type: "subscription" },
+                    finished: false
+                  }],
+                  hadAnySubscription: true
+                };
+              }
+              if (json.uid || 'hasPlus' in json || url.includes('account/about')) {
+                json.hasPlus = true;
+                json.serviceAvailable = true;
+                if (!json.options) json.options = [];
+                if (!json.options.includes('plus')) json.options.push('plus');
+              }
               return new Response(JSON.stringify(json), {
                 status: res.status,
                 statusText: res.statusText,
@@ -161,10 +169,18 @@
           if (this.readyState === 4 && this.status === 200) {
             try {
               const data = JSON.parse(this.responseText);
-              if (data && data.result) {
-                data.result.account = { ...(data.result.account || {}), ...plusData };
-                data.result.permissions = plusPerms;
-                data.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
+              if (data) {
+                if (data.result) {
+                  data.result.account = { ...(data.result.account || {}), ...plusData };
+                  data.result.permissions = plusPerms;
+                  data.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
+                }
+                if (data.uid || 'hasPlus' in data || (this._url && this._url.includes('account/about'))) {
+                  data.hasPlus = true;
+                  data.serviceAvailable = true;
+                  if (!data.options) data.options = [];
+                  if (!data.options.includes('plus')) data.options.push('plus');
+                }
                 Object.defineProperty(this, 'responseText', { value: JSON.stringify(data) });
                 Object.defineProperty(this, 'response', { value: JSON.stringify(data) });
               }

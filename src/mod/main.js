@@ -85,6 +85,19 @@ function initMod(mainWindow) {
     });
   }
 
+  // 3.5 Asset Provider for Sandboxed Preload
+  electron.ipcMain.on('mod:get-assets', (event) => {
+    try {
+      const cssPath = path.join(__dirname, 'client.css');
+      const jsPath = path.join(__dirname, 'client.js');
+      const css = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, 'utf8') : '';
+      const js = fs.existsSync(jsPath) ? fs.readFileSync(jsPath, 'utf8') : '';
+      event.returnValue = { css, js };
+    } catch (e) {
+      event.returnValue = { css: '', js: '' };
+    }
+  });
+
   // 4. IPC Handlers: Settings
   electron.ipcMain.handle('mod:get-settings', async () => {
     return settingsManager.getAll();
@@ -215,27 +228,56 @@ function initMod(mainWindow) {
   });
 
   // 7. IPC Handlers: Player State for Discord RPC
+  let lastRpcState = {
+    trackId: null,
+    isPlaying: false,
+    startTimestamp: 0,
+    endTimestamp: 0,
+    lastSentTime: 0
+  };
+
   electron.ipcMain.on('mod:update-player-state', (event, state) => {
     if (!settingsManager.get('discordRpcEnabled')) return;
 
     if (!state || !state.isPlaying || !state.track) {
-      discordRpc.clearActivity();
+      if (lastRpcState.isPlaying) {
+        lastRpcState.isPlaying = false;
+        lastRpcState.trackId = null;
+        discordRpc.clearActivity();
+      }
       return;
     }
 
     const { track, position = 0, duration = 0 } = state;
-    const artists = (track.artists || []).map(a => a.name || a).join(', ') || 'Неизвестный исполнитель';
-    const title = track.title || 'Без названия';
-    const album = track.albums?.[0]?.title || '';
-
+    const trackId = String(track.id || track.title);
     const nowMs = Date.now();
     const posSec = Math.max(0, position);
     const durSec = Math.max(0, duration || (track.durationMs ? track.durationMs / 1000 : 0));
 
-    const startTimestamp = Math.floor(nowMs - (posSec * 1000));
-    const endTimestamp = durSec > 0 ? Math.floor(startTimestamp + (durSec * 1000)) : undefined;
+    const calculatedStart = Math.floor(nowMs - (posSec * 1000));
+    const calculatedEnd = durSec > 0 ? Math.floor(calculatedStart + (durSec * 1000)) : undefined;
 
-    let coverUrl = 'https://cdn.rcd.gg/PreMiD/websites/Y/Yandex%20Music/assets/logo.png';
+    // Prevent constant activity reset: only resend if track changed, playback resumed, user seeked, or 60s elapsed
+    const isSameTrack = lastRpcState.trackId === trackId && lastRpcState.isPlaying;
+    const expectedCurrentPosSec = (nowMs - lastRpcState.startTimestamp) / 1000;
+    const isSeeked = Math.abs(expectedCurrentPosSec - posSec) > 3;
+    const isPeriodicResync = (nowMs - lastRpcState.lastSentTime) > 60000;
+
+    if (isSameTrack && !isSeeked && !isPeriodicResync) {
+      return;
+    }
+
+    lastRpcState.trackId = trackId;
+    lastRpcState.isPlaying = true;
+    lastRpcState.startTimestamp = calculatedStart;
+    lastRpcState.endTimestamp = calculatedEnd;
+    lastRpcState.lastSentTime = nowMs;
+
+    const artists = (track.artists || []).map(a => a.name || a).join(', ') || 'Неизвестный исполнитель';
+    const title = track.title || 'Без названия';
+    const album = track.albums?.[0]?.title || '';
+
+    let coverUrl = 'og-image';
     if (track.coverUri) {
       coverUrl = track.coverUri.startsWith('http') ? track.coverUri : `https://${track.coverUri.replace('%%', '400x400')}`;
     }
@@ -248,18 +290,18 @@ function initMod(mainWindow) {
       details: String(title).slice(0, 128),
       state: String(stateText).slice(0, 128),
       timestamps: {
-        start: startTimestamp
+        start: calculatedStart
       },
       assets: {
         large_image: coverUrl,
         large_text: String(album ? `Альбом: ${album}` : (title || 'Яндекс Музыка')).slice(0, 128),
-        small_image: 'https://cdn.rcd.gg/PreMiD/websites/Y/Yandex%20Music/assets/logo.png',
+        small_image: 'og-image',
         small_text: 'Яндекс Музыка'
       }
     };
 
-    if (endTimestamp && endTimestamp > startTimestamp) {
-      activityPayload.timestamps.end = endTimestamp;
+    if (calculatedEnd && calculatedEnd > calculatedStart) {
+      activityPayload.timestamps.end = calculatedEnd;
     }
 
     if (track.id) {

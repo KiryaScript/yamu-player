@@ -1,6 +1,4 @@
 'use strict';
-const node_fs = require('node:fs');
-const node_path = require('node:path');
 const electron = require('electron');
 var IpcChannel = /* @__PURE__ */ ((IpcChannel2) => {
   IpcChannel2["BOOTSTRAP"] = "desktop:bootstrap";
@@ -259,21 +257,18 @@ const exposeYandexModBridge = () => {
 
   window.document.addEventListener("DOMContentLoaded", () => {
     try {
-      const cssPath = node_path.join(__dirname, 'mod', 'client.css');
-      if (node_fs.existsSync(cssPath)) {
-        const cssContent = node_fs.readFileSync(cssPath, 'utf8');
+      const assets = electron.ipcRenderer.sendSync('mod:get-assets');
+      if (assets && assets.css) {
         const styleEl = document.createElement('style');
         styleEl.id = 'ym-mod-injected-styles';
-        styleEl.textContent = cssContent;
+        styleEl.textContent = assets.css;
         document.head.appendChild(styleEl);
       }
 
-      const jsPath = node_path.join(__dirname, 'mod', 'client.js');
-      if (node_fs.existsSync(jsPath)) {
-        const jsContent = node_fs.readFileSync(jsPath, 'utf8');
+      if (assets && assets.js) {
         const scriptEl = document.createElement('script');
         scriptEl.id = 'ym-mod-injected-script';
-        scriptEl.textContent = jsContent;
+        scriptEl.textContent = assets.js;
         document.body.appendChild(scriptEl);
       }
     } catch (err) {
@@ -310,7 +305,7 @@ const installApplicationMod = () => {
     const isAccountStatusUrl = (u) => {
       if (!u || typeof u !== 'string') return false;
       if (u.includes('passport.yandex') || u.includes('oauth.yandex') || u.includes('/auth/')) return false;
-      return u.includes('/account/status') || u.includes('/api/v2.1/account/status');
+      return u.includes('/account/status') || u.includes('/api/v2.1/account/status') || u.includes('account/about') || u.includes('/account/about');
     };
 
     const plusAccountData = {
@@ -348,21 +343,29 @@ const installApplicationMod = () => {
           try {
             const clone = res.clone();
             const json = await clone.json();
-            if (json && json.result) {
-              json.result.account = { ...(json.result.account || {}), ...plusAccountData };
-              json.result.permissions = plusPermissions;
-              json.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
-              json.result.subscription = {
-                canStartTrial: false,
-                mcdonalds: false,
-                autoRenewable: [{
-                  expires: "2099-01-01T00:00:00+00:00",
-                  vendor: "Yandex",
-                  product: { productId: "plus", type: "subscription" },
-                  finished: false
-                }],
-                hadAnySubscription: true
-              };
+            if (json) {
+              if (json.result) {
+                json.result.account = { ...(json.result.account || {}), ...plusAccountData };
+                json.result.permissions = plusPermissions;
+                json.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
+                json.result.subscription = {
+                  canStartTrial: false,
+                  mcdonalds: false,
+                  autoRenewable: [{
+                    expires: "2099-01-01T00:00:00+00:00",
+                    vendor: "Yandex",
+                    product: { productId: "plus", type: "subscription" },
+                    finished: false
+                  }],
+                  hadAnySubscription: true
+                };
+              }
+              if (json.uid || 'hasPlus' in json || url.includes('account/about')) {
+                json.hasPlus = true;
+                json.serviceAvailable = true;
+                if (!json.options) json.options = [];
+                if (!json.options.includes('plus')) json.options.push('plus');
+              }
               return new Response(JSON.stringify(json), {
                 status: res.status,
                 statusText: res.statusText,
@@ -388,10 +391,18 @@ const installApplicationMod = () => {
           if (this.readyState === 4 && this.status === 200) {
             try {
               const data = JSON.parse(this.responseText);
-              if (data && data.result) {
-                data.result.account = { ...(data.result.account || {}), ...plusAccountData };
-                data.result.permissions = plusPermissions;
-                data.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
+              if (data) {
+                if (data.result) {
+                  data.result.account = { ...(data.result.account || {}), ...plusAccountData };
+                  data.result.permissions = plusPermissions;
+                  data.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
+                }
+                if (data.uid || 'hasPlus' in data || (this._url && this._url.includes('account/about'))) {
+                  data.hasPlus = true;
+                  data.serviceAvailable = true;
+                  if (!data.options) data.options = [];
+                  if (!data.options.includes('plus')) data.options.push('plus');
+                }
                 Object.defineProperty(this, 'responseText', { value: JSON.stringify(data) });
                 Object.defineProperty(this, 'response', { value: JSON.stringify(data) });
               }

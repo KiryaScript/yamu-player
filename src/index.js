@@ -2630,12 +2630,10 @@ const readPassportLoginWithDiagnostics = async ({
     const attempt = authDiagnostics.captureAttempt();
     return readPassportLoginWithDiagnostics({
       readPassportCookies: () => electron.session.defaultSession.cookies.get({
-        name: PASSPORT_LOGIN,
-        domain: PASSPORT_LOGIN_DOMAIN
+        name: PASSPORT_LOGIN
       }),
       readSessionCookies: () => electron.session.defaultSession.cookies.get({
-        name: PASSPORT_SESSION,
-        domain: PASSPORT_LOGIN_DOMAIN
+        name: PASSPORT_SESSION
       }),
       record: (payload) => authDiagnostics.recordForAttempt(attempt, payload),
       onPassportReadError: (error) => {
@@ -2650,8 +2648,7 @@ const readPassportLoginWithDiagnostics = async ({
     eventsLogger.info("Event received", IpcChannel.GET_YANDEX_UID);
     try {
       const cookie = await electron.session.defaultSession.cookies.get({
-        name: YANDEX_ID,
-        domain: PASSPORT_LOGIN_DOMAIN
+        name: YANDEX_ID
       });
       return cookie?.[0]?.value;
     } catch (error) {
