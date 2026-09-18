@@ -175,7 +175,7 @@ class DiscordRpc {
         assets: activity.assets || {
           large_image: 'https://cdn.rcd.gg/PreMiD/websites/Y/Yandex%20Music/assets/logo.png',
           large_text: 'Яндекс Музыка',
-          small_image: 'https://music.yandex.ru/favicon.png',
+          small_image: 'https://cdn.rcd.gg/PreMiD/websites/Y/Yandex%20Music/assets/logo.png',
           small_text: 'Яндекс Музыка'
         }
       };

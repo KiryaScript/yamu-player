@@ -1,6 +1,30 @@
 'use strict';
 
 // ---------------------------------------------------------
+// GLOBAL AUDIO ELEMENT TRACKER FOR DISCORD RPC & PLAYER
+// ---------------------------------------------------------
+try {
+  window.__ymActiveAudio = null;
+  const origPlay = HTMLMediaElement.prototype.play;
+  if (origPlay) {
+    HTMLMediaElement.prototype.play = function(...args) {
+      window.__ymActiveAudio = this;
+      return origPlay.apply(this, args);
+    };
+  }
+  const origCreateEl = document.createElement.bind(document);
+  document.createElement = function(tagName, options) {
+    const el = origCreateEl(tagName, options);
+    if (tagName && String(tagName).toLowerCase() === 'audio') {
+      window.__ymActiveAudio = el;
+      el.addEventListener('play', () => { window.__ymActiveAudio = el; });
+      el.addEventListener('playing', () => { window.__ymActiveAudio = el; });
+    }
+    return el;
+  };
+} catch (e) {}
+
+// ---------------------------------------------------------
 // YANDEX PLUS SUBSCRIPTION UNLOCKER (PRO FEATURES & HQ AUDIO)
 // ---------------------------------------------------------
 try {

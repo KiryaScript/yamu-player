@@ -232,18 +232,23 @@
   // 3. TRACK & PLAYBACK STATE DETECTION (MULTI-SOURCE)
   // ---------------------------------------------------------
   function isPlayerPlaying() {
-    // Check 1: MediaSession
+    // Check 1: Active audio element intercepted by preload/client
+    if (window.__ymActiveAudio && !window.__ymActiveAudio.paused && !window.__ymActiveAudio.ended && window.__ymActiveAudio.currentTime > 0) {
+      return true;
+    }
+
+    // Check 2: MediaSession
     if (navigator.mediaSession && navigator.mediaSession.playbackState === 'playing') {
       return true;
     }
 
-    // Check 2: Audio elements
+    // Check 3: Audio elements in DOM
     const audios = document.querySelectorAll('audio');
     for (const a of audios) {
       if (!a.paused && !a.ended && a.currentTime > 0) return true;
     }
 
-    // Check 3: Play/Pause button state in DOM (Pause icon displayed means track is active & playing)
+    // Check 4: Play/Pause button state in DOM (Pause icon displayed means track is active & playing)
     const playerBar = document.querySelector('[class*="PlayerBar"], [class*="playerBar"], [class*="Player_root"], [data-test-id*="PLAYER"], footer');
     if (playerBar) {
       const pauseIcon = playerBar.querySelector('[data-test-id*="PAUSE"], [aria-label*="Пауза"], [aria-label*="Pause"], [class*="pause"], [class*="Pause"]');
@@ -265,22 +270,35 @@
     let position = 0;
     let duration = 0;
 
-    // 1. Check externalAPI.getProgress()
-    try {
-      if (window.externalAPI && typeof window.externalAPI.getProgress === 'function') {
-        const p = window.externalAPI.getProgress();
-        if (p) {
-          if (typeof p.position === 'number' && isFinite(p.position) && p.position >= 0) {
-            position = p.position;
-          }
-          if (typeof p.duration === 'number' && isFinite(p.duration) && p.duration > 0) {
-            duration = p.duration;
+    // 1. Check intercepted active audio element (created via document.createElement('audio') or HTMLMediaElement.prototype.play)
+    const activeAudio = window.__ymActiveAudio;
+    if (activeAudio) {
+      if (typeof activeAudio.currentTime === 'number' && isFinite(activeAudio.currentTime) && activeAudio.currentTime >= 0) {
+        position = activeAudio.currentTime;
+      }
+      if (typeof activeAudio.duration === 'number' && isFinite(activeAudio.duration) && activeAudio.duration > 0) {
+        duration = activeAudio.duration;
+      }
+    }
+
+    // 2. Check externalAPI.getProgress()
+    if (position <= 0 || duration <= 0) {
+      try {
+        if (window.externalAPI && typeof window.externalAPI.getProgress === 'function') {
+          const p = window.externalAPI.getProgress();
+          if (p) {
+            if (position <= 0 && typeof p.position === 'number' && isFinite(p.position) && p.position >= 0) {
+              position = p.position;
+            }
+            if (duration <= 0 && typeof p.duration === 'number' && isFinite(p.duration) && p.duration > 0) {
+              duration = p.duration;
+            }
           }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
 
-    // 2. Fallback: Audio element in DOM
+    // 3. Fallback: Audio element in DOM
     if (position <= 0 || duration <= 0) {
       try {
         const audios = document.querySelectorAll('audio');
@@ -295,13 +313,52 @@
       } catch (e) {}
     }
 
-    // 3. Fallback: Track metadata durationMs
+    // 4. Fallback: Track metadata durationMs
     if (duration <= 0 && track) {
       if (typeof track.durationMs === 'number' && track.durationMs > 0) {
         duration = track.durationMs / 1000;
       } else if (typeof track.duration === 'number' && track.duration > 0) {
         duration = track.duration > 1000 ? track.duration / 1000 : track.duration;
       }
+    }
+
+    // 5. Fallback: Track metadata cache by trackId
+    if (duration <= 0 && track?.id && window.__ymModGetTrackMetaCache) {
+      const cached = window.__ymModGetTrackMetaCache()[track.id];
+      if (cached?.durationMs && cached.durationMs > 0) {
+        duration = cached.durationMs / 1000;
+      }
+    }
+
+    // 6. Fallback: DOM PlayerBar attributes and text
+    if (position <= 0 || duration <= 0) {
+      try {
+        const playerBar = document.querySelector('[class*="PlayerBar"], [class*="playerBar"], [class*="Player_root"], [class*="VibePlayerBar"], [data-test-id*="PLAYER"], footer');
+        if (playerBar) {
+          const slider = playerBar.querySelector('[role="progressbar"], [role="slider"]');
+          if (slider) {
+            const valNow = parseFloat(slider.getAttribute('aria-valuenow'));
+            const valMax = parseFloat(slider.getAttribute('aria-valuemax'));
+            if (position <= 0 && isFinite(valNow) && valNow >= 0) position = valNow;
+            if (duration <= 0 && isFinite(valMax) && valMax > 0) duration = valMax;
+          }
+
+          if (duration <= 0 || position <= 0) {
+            const timeNodes = Array.from(playerBar.querySelectorAll('span, div, p, time'))
+              .filter(el => el.children.length === 0 && /^\s*\d+:\d{2}\s*$/.test(el.textContent));
+            if (timeNodes.length >= 2) {
+              const parseSec = (str) => {
+                const parts = str.trim().split(':');
+                return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+              };
+              const t1 = parseSec(timeNodes[0].textContent);
+              const t2 = parseSec(timeNodes[1].textContent);
+              if (position <= 0 && isFinite(t1)) position = t1;
+              if (duration <= 0 && isFinite(t2) && t2 > 0) duration = t2;
+            }
+          }
+        }
+      } catch (e) {}
     }
 
     return {
@@ -361,6 +418,7 @@
       let artist = '';
       let coverUri = '';
       let album = '';
+      let durationMs = 0;
 
       // Layer 1: MediaSession (accurate in Chromium during playback)
       if (navigator.mediaSession && navigator.mediaSession.metadata) {
@@ -408,6 +466,8 @@
                   if (!title && tr.title) title = tr.title;
                   if (!artist && tr.artists?.[0]?.name) artist = tr.artists[0].name;
                   if (!coverUri && tr.coverUri) coverUri = `https://${tr.coverUri.replace('%%', '400x400')}`;
+                  if (tr.durationMs) durationMs = tr.durationMs;
+                  else if (tr.duration) durationMs = tr.duration > 1000 ? tr.duration : tr.duration * 1000;
                   break;
                 }
               }
@@ -463,7 +523,8 @@
           title: title || 'Неизвестный трек',
           artists: [{ name: artist || 'Яндекс Музыка' }],
           albums: [{ title: album || '' }],
-          coverUri: coverUri || ''
+          coverUri: coverUri || '',
+          durationMs: durationMs || 0
         };
       }
     } catch (e) {}
@@ -806,10 +867,20 @@
 
       const trackKey = `${track.id || track.title}:${track.artists?.[0]?.name || ''}`;
       const now = Date.now();
-      const expectedPosition = lastPosition + ((now - lastUpdateTimestamp) / 1000);
-      const hasSeeked = Math.abs(position - expectedPosition) > 3;
 
-      if (trackKey !== lastTrackKey || isPlaying !== lastPlaying || hasSeeked) {
+      // Detect manual seek only when playback is legitimately active
+      let hasSeeked = false;
+      if (lastUpdateTimestamp > 0 && lastPosition > 0 && position > 0) {
+        const elapsedSec = (now - lastUpdateTimestamp) / 1000;
+        const expectedPos = lastPosition + elapsedSec;
+        if (Math.abs(position - expectedPos) > 5) {
+          hasSeeked = true;
+        }
+      }
+
+      const shouldUpdate = (trackKey !== lastTrackKey) || (isPlaying !== lastPlaying) || hasSeeked;
+
+      if (shouldUpdate) {
         lastTrackKey = trackKey;
         lastPlaying = isPlaying;
         lastPosition = position;
@@ -821,7 +892,7 @@
           position,
           duration
         });
-        console.log('[DiscordRPC] Sent player state update:', track.title, 'by', track.artists?.[0]?.name, `(${position.toFixed(0)}s/${duration.toFixed(0)}s)`);
+        console.log('[DiscordRPC] Sent player state update:', track.title, 'by', track.artists?.[0]?.name, `(${position.toFixed(1)}s/${duration.toFixed(1)}s), hasSeeked: ${hasSeeked}`);
       }
     }, 1000);
   }

@@ -241,7 +241,7 @@ function initMod(mainWindow) {
       assets: {
         large_image: coverUrl,
         large_text: String(album ? `Альбом: ${album}` : (title || 'Яндекс Музыка')).slice(0, 128),
-        small_image: 'https://music.yandex.ru/favicon.png',
+        small_image: 'https://cdn.rcd.gg/PreMiD/websites/Y/Yandex%20Music/assets/logo.png',
         small_text: 'Яндекс Музыка'
       }
     };
