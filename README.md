@@ -1,5 +1,7 @@
 # ⚡ Yandex Music Enhanced Mod
 
+ОБХОД ПОДПИСКИ ВРЕМЕННО НЕ РАБОТАЕТ. ОЖИДАЙТЕ ОБНОВЛЕНИЯ.
+
 <div align="center">
 
 [![Release](https://img.shields.io/badge/Release-v5.116.3--mod.2.6.5-brightgreen.svg?style=flat-square)](https://github.com/KiryaScript/yamu-player/releases/tag/5.116.3-mod.2.6.5)
