@@ -9,17 +9,18 @@ const libraryBackup = require('./library_backup');
 function initMod(mainWindow) {
   console.log('[YandexMusicMod] Initializing Enhanced Mod Engine v2.5...');
 
-  // 1. Block Telemetry & Stream Log Trackers (Anti-Ban / Privacy)
+  // 1. Block Telemetry & Stream Log Trackers (Anti-Ban / Privacy with Whitelist)
   try {
     const blockedPatterns = [
       '*://log.strm.yandex.ru/*',
-      '*://*.strm.yandex.ru/*',
       '*://metrika.yandex.ru/*',
       '*://*.metrika.yandex.ru/*',
       '*://mc.yandex.ru/*',
       '*://*.mc.yandex.ru/*',
       '*://an.yandex.ru/*',
-      '*://*.an.yandex.ru/*'
+      '*://*.an.yandex.ru/*',
+      '*://clck.yandex.ru/*',
+      '*://yandex.ru/clck/*'
     ];
 
     electron.session.defaultSession.webRequest.onBeforeRequest(
@@ -27,14 +28,19 @@ function initMod(mainWindow) {
       (details, callback) => {
         const url = details.url || '';
         const initiator = details.initiator || '';
-        // NEVER block any passport, auth, oauth, or captcha requests!
+        const referrer = details.referrer || '';
+        
+        // CRITICAL ANTI-BAN WHITELIST: NEVER block any passport, login, oauth, sso, or captcha requests!
         if (
           initiator.includes('passport.yandex') ||
           initiator.includes('oauth.yandex') ||
           initiator.includes('sso.passport') ||
+          initiator.includes('captcha') ||
           url.includes('passport.yandex') ||
           url.includes('oauth.yandex') ||
-          url.includes('smartcaptcha')
+          url.includes('smartcaptcha') ||
+          referrer.includes('passport.yandex') ||
+          referrer.includes('oauth.yandex')
         ) {
           callback({});
           return;
@@ -43,10 +49,73 @@ function initMod(mainWindow) {
         callback({ cancel: true });
       }
     );
-    console.log('[YandexMusicMod] Telemetry & log.strm.yandex.ru blocker activated.');
+    console.log('[YandexMusicMod] Telemetry & log.strm.yandex.ru blocker activated (Anti-Ban Whitelist active).');
   } catch (err) {
     console.warn('[YandexMusicMod] Failed to attach webRequest blocker:', err);
   }
+
+  // 1.1 Dynamic User Account Cache (Prevents Session Desync & Ghost Session Bans)
+  let currentUserAccountCache = null;
+
+  async function extractUserAccountFromCookies() {
+    try {
+      const cookiesRu = await electron.session.defaultSession.cookies.get({ domain: '.yandex.ru' });
+      const cookiesCom = await electron.session.defaultSession.cookies.get({ domain: '.yandex.com' });
+      const allCookies = cookiesRu.concat(cookiesCom);
+      let uid = null;
+      let login = null;
+      let displayName = null;
+
+      for (const c of allCookies) {
+        if (c.name === 'Session_id' && c.value) {
+          const m = c.value.match(/\|(\d{6,12})\./);
+          if (m) uid = m[1];
+        }
+        if (c.name === 'yandex_login' && c.value) {
+          login = c.value;
+        }
+        if (c.name === 'yp' && c.value) {
+          const m = c.value.match(/udn\.([^#]+)/);
+          if (m) {
+            try {
+              displayName = Buffer.from(m[1], 'base64').toString('utf8');
+            } catch (err) {}
+          }
+        }
+      }
+
+      if (uid) {
+        currentUserAccountCache = {
+          uid: Number(uid),
+          login: login || 'user',
+          displayName: displayName || login || 'Пользователь',
+          hasPlus: true,
+          options: ['plus']
+        };
+        console.log(`[YandexMusicMod] Active session: UID=${uid}, Name=${currentUserAccountCache.displayName}`);
+      } else {
+        currentUserAccountCache = null;
+      }
+    } catch (e) {
+      console.warn('[YandexMusicMod] Error extracting user account:', e);
+    }
+    return currentUserAccountCache;
+  }
+
+  try {
+    electron.session.defaultSession.cookies.on('changed', () => {
+      extractUserAccountFromCookies().catch(() => {});
+    });
+  } catch (e) {}
+  extractUserAccountFromCookies().catch(() => {});
+
+  electron.ipcMain.on('mod:get-user-account-sync', (event) => {
+    event.returnValue = currentUserAccountCache;
+  });
+
+  electron.ipcMain.handle('mod:get-user-account', async () => {
+    return await extractUserAccountFromCookies();
+  });
 
   // 2. Start Discord RPC
   if (settingsManager.get('discordRpcEnabled')) {
@@ -84,19 +153,6 @@ function initMod(mainWindow) {
       }
     });
   }
-
-  // 3.5 Asset Provider for Sandboxed Preload
-  electron.ipcMain.on('mod:get-assets', (event) => {
-    try {
-      const cssPath = path.join(__dirname, 'client.css');
-      const jsPath = path.join(__dirname, 'client.js');
-      const css = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, 'utf8') : '';
-      const js = fs.existsSync(jsPath) ? fs.readFileSync(jsPath, 'utf8') : '';
-      event.returnValue = { css, js };
-    } catch (e) {
-      event.returnValue = { css: '', js: '' };
-    }
-  });
 
   // 4. IPC Handlers: Settings
   electron.ipcMain.handle('mod:get-settings', async () => {
@@ -227,7 +283,7 @@ function initMod(mainWindow) {
     return { count: 0, updatedAt: null };
   });
 
-  // 7. IPC Handlers: Player State for Discord RPC
+  // 7. IPC Handlers: Player State for Discord RPC (With Debounce & Native Asset)
   let lastRpcState = {
     trackId: null,
     isPlaying: false,
@@ -257,7 +313,7 @@ function initMod(mainWindow) {
     const calculatedStart = Math.floor(nowMs - (posSec * 1000));
     const calculatedEnd = durSec > 0 ? Math.floor(calculatedStart + (durSec * 1000)) : undefined;
 
-    // Prevent constant activity reset: only resend if track changed, playback resumed, user seeked, or 60s elapsed
+    // Debounce: only update if track changed, playback toggled, seeked > 3s, or 60s periodic sync
     const isSameTrack = lastRpcState.trackId === trackId && lastRpcState.isPlaying;
     const expectedCurrentPosSec = (nowMs - lastRpcState.startTimestamp) / 1000;
     const isSeeked = Math.abs(expectedCurrentPosSec - posSec) > 3;

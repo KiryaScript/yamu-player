@@ -1,9 +1,9 @@
 {
-  "version": "2.7.0",
-  "appVersion": "5.120.0",
+  "version": "2.6.5f",
+  "appVersion": "5.116.3",
   "mandatory": false,
-  "title": "Обновление до Яндекс Музыки 5.120.0 + Spotify-стиль в Discord",
-  "changelog": "• Полная адаптация и поддержка новой версии Яндекс Музыки 5.120.0\n• Поддержка обновлённой архитектуры IPC и Renderer Bridge (musicDesktop)\n• Статус в Discord в стиле Spotify («Слушает Yandex Music»)\n• Точный прогресс-бар и синхронизация времени трека в Discord",
+  "title": "Обновление v2.6.5f: Anti-Ban защита и полный редизайн интерфейса (5.116.3)",
+  "changelog": "• Комплексная Anti-Ban защита: безусловный whitelist для Passport, Captcha и OAuth в сетевых фильтрах\n• Динамическая синхронизация сессии из cookies (устранение рассинхрона UID и ошибок авторизации)\n• Полный редизайн интерфейса мода: замена всех эмодзи и устаревших иконок на современные стильные SVG-иконки\n• Версия 5.120.0 временно не поддерживается (пропатчить пока невозможно из-за ограничений бэкенда), мод базируется на стабильной 5.116.3\n• Discord RPC дебаунсинг и нативный ассет og-image",
   "patcherUrl": "https://github.com/KiryaScript/yamu-player/releases/latest",
   "portableUrl": "https://github.com/KiryaScript/yamu-player/releases/latest"
 }

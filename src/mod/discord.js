@@ -168,15 +168,12 @@ class DiscordRpc {
     let payloadActivity = null;
     if (activity) {
       payloadActivity = {
-        type: typeof activity.type === 'number' ? activity.type : 2,
         details: activity.details ? String(activity.details).slice(0, 128) : 'Слушает музыку',
         state: activity.state ? String(activity.state).slice(0, 128) : undefined,
         timestamps: activity.timestamps,
         assets: activity.assets || {
-          large_image: 'https://cdn.rcd.gg/PreMiD/websites/Y/Yandex%20Music/assets/logo.png',
-          large_text: 'Яндекс Музыка',
-          small_image: 'https://cdn.rcd.gg/PreMiD/websites/Y/Yandex%20Music/assets/logo.png',
-          small_text: 'Яндекс Музыка'
+          large_image: 'https://music.yandex.ru/favicon.png',
+          large_text: 'Яндекс Музыка'
         }
       };
 

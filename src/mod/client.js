@@ -1,8 +1,8 @@
-// Yandex Music Enhanced Mod - Renderer Script v2.7.0
+// Yandex Music Enhanced Mod - Renderer Script v2.6.5
 (function() {
-  console.log('[YandexMusicMod] Injecting Mod Client v2.7.0...');
+  console.log('[YandexMusicMod] Injecting Mod Client v2.6.5...');
 
-  const CURRENT_MOD_VERSION = '2.7.0';
+  const CURRENT_MOD_VERSION = '2.6.5';
   const GITHUB_CHANGELOG_URL = 'https://raw.githubusercontent.com/KiryaScript/yamu-player/refs/heads/main/CHANGELOG.md';
   const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/KiryaScript/yamu-player/refs/heads/main/version.json';
   const RELEASES_PAGE_URL = 'https://github.com/KiryaScript/yamu-player/releases/latest';
@@ -28,30 +28,6 @@
   window.__ymModGetRecentTrackHistory = () => _recentTrackHistory;
   window.__ymModGetTrackMetaCache = () => _trackMetaCache;
   window.__ymModSafeFetch = safeFetch;
-
-  // ---------------------------------------------------------
-  // 0. MAIN-WORLD AUDIO ELEMENT TRACKER (FOR DISCORD RPC & PLAYER)
-  // ---------------------------------------------------------
-  try {
-    window.__ymActiveAudio = window.__ymActiveAudio || null;
-    const origPlay = HTMLMediaElement.prototype.play;
-    if (origPlay) {
-      HTMLMediaElement.prototype.play = function(...args) {
-        window.__ymActiveAudio = this;
-        return origPlay.apply(this, args);
-      };
-    }
-    const origCreateEl = document.createElement.bind(document);
-    document.createElement = function(tagName, options) {
-      const el = origCreateEl(tagName, options);
-      if (tagName && String(tagName).toLowerCase() === 'audio') {
-        window.__ymActiveAudio = el;
-        el.addEventListener('play', () => { window.__ymActiveAudio = el; });
-        el.addEventListener('playing', () => { window.__ymActiveAudio = el; });
-      }
-      return el;
-    };
-  } catch (e) {}
 
   // ---------------------------------------------------------
   // 1. MAIN-WORLD YANDEX PLUS UNLOCKER (UNLIMITED PLAYBACK & HQ)
@@ -82,12 +58,6 @@
       ]
     };
 
-    function isAccountStatusUrl(u) {
-      if (!u || typeof u !== 'string') return false;
-      if (u.includes('passport.yandex') || u.includes('oauth.yandex') || u.includes('/auth/')) return false;
-      return u.includes('/account/status') || u.includes('/api/v2.1/account/status') || u.includes('account/about') || u.includes('/account/about');
-    }
-
     if (origFetch) {
       window.fetch = async function(...args) {
         const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
@@ -113,25 +83,14 @@
           } catch (e) {}
         }
 
-        if (isAccountStatusUrl(url)) {
+        if (url.includes('/account/status') || url.includes('/status')) {
           try {
-            let json = null;
-            try {
-              const clone = res.clone();
-              json = await clone.json();
-            } catch (err) {}
-            if (!json || typeof json !== 'object') {
-              json = { result: {} };
-            }
-            if (json.result && typeof json.result === 'object') {
+            const clone = res.clone();
+            const json = await clone.json();
+            if (json && json.result) {
               json.result.account = { ...(json.result.account || {}), ...plusData };
               json.result.permissions = plusPerms;
               json.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
-              json.result.hasPlus = true;
-              json.result.hasMusicSubscription = true;
-              json.result.serviceAvailable = true;
-              if (!Array.isArray(json.result.options)) json.result.options = [];
-              if (!json.result.options.includes('plus')) json.result.options.push('plus');
               json.result.subscription = {
                 canStartTrial: false,
                 mcdonalds: false,
@@ -143,37 +102,13 @@
                 }],
                 hadAnySubscription: true
               };
+              return new Response(JSON.stringify(json), {
+                status: res.status,
+                statusText: res.statusText,
+                headers: res.headers
+              });
             }
-            json.hasPlus = true;
-            json.hasMusicSubscription = true;
-            json.serviceAvailable = true;
-            if (!Array.isArray(json.options)) json.options = [];
-            if (!json.options.includes('plus')) json.options.push('plus');
-
-            return new Response(JSON.stringify(json), {
-              status: 200,
-              statusText: "OK",
-              headers: { "content-type": "application/json; charset=utf-8" }
-            });
-          } catch (e) {
-            const fallback = {
-              hasPlus: true,
-              serviceAvailable: true,
-              options: ['plus'],
-              result: {
-                hasPlus: true,
-                serviceAvailable: true,
-                options: ['plus'],
-                account: plusData,
-                permissions: plusPerms
-              }
-            };
-            return new Response(JSON.stringify(fallback), {
-              status: 200,
-              statusText: "OK",
-              headers: { "content-type": "application/json; charset=utf-8" }
-            });
-          }
+          } catch (e) {}
         }
 
         return res;
@@ -191,33 +126,18 @@
       return origXhrOpen.apply(this, [method, url, ...rest]);
     };
     window.XMLHttpRequest.prototype.send = function(...sendArgs) {
-      if (this._url && isAccountStatusUrl(this._url)) {
+      if (this._url && (this._url.includes('/account/status') || this._url.includes('/status'))) {
         this.addEventListener('readystatechange', () => {
-          if (this.readyState === 4) {
+          if (this.readyState === 4 && this.status === 200) {
             try {
-              let data = null;
-              try { data = JSON.parse(this.responseText); } catch (e) {}
-              if (!data || typeof data !== 'object') data = { result: {} };
-              if (data.result && typeof data.result === 'object') {
+              const data = JSON.parse(this.responseText);
+              if (data && data.result) {
                 data.result.account = { ...(data.result.account || {}), ...plusData };
                 data.result.permissions = plusPerms;
                 data.result.plus = { hasPlus: true, isAvailable: true, isTutorialCompleted: true };
-                data.result.hasPlus = true;
-                data.result.hasMusicSubscription = true;
-                data.result.serviceAvailable = true;
-                if (!Array.isArray(data.result.options)) data.result.options = [];
-                if (!data.result.options.includes('plus')) data.result.options.push('plus');
+                Object.defineProperty(this, 'responseText', { value: JSON.stringify(data) });
+                Object.defineProperty(this, 'response', { value: JSON.stringify(data) });
               }
-              data.hasPlus = true;
-              data.hasMusicSubscription = true;
-              data.serviceAvailable = true;
-              if (!Array.isArray(data.options)) data.options = [];
-              if (!data.options.includes('plus')) data.options.push('plus');
-
-              Object.defineProperty(this, 'status', { value: 200, configurable: true });
-              Object.defineProperty(this, 'statusText', { value: 'OK', configurable: true });
-              Object.defineProperty(this, 'responseText', { value: JSON.stringify(data), configurable: true });
-              Object.defineProperty(this, 'response', { value: JSON.stringify(data), configurable: true });
             } catch (e) {}
           }
         });
@@ -287,7 +207,16 @@
 
     const iconEl = document.createElement('div');
     iconEl.style.fontSize = '16px';
-    iconEl.textContent = type === 'success' ? '✅' : type === 'error' ? '❌' : '🎵';
+    iconEl.style.display = 'inline-flex';
+    iconEl.style.alignItems = 'center';
+    iconEl.style.justifyContent = 'center';
+    if (type === 'success') {
+      iconEl.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+    } else if (type === 'error') {
+      iconEl.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+    } else {
+      iconEl.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#ffcc00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
+    }
 
     const textEl = document.createElement('div');
     textEl.style.flex = '1';
@@ -312,23 +241,18 @@
   // 3. TRACK & PLAYBACK STATE DETECTION (MULTI-SOURCE)
   // ---------------------------------------------------------
   function isPlayerPlaying() {
-    // Check 1: Active audio element intercepted by preload/client
-    if (window.__ymActiveAudio && !window.__ymActiveAudio.paused && !window.__ymActiveAudio.ended && window.__ymActiveAudio.currentTime > 0) {
-      return true;
-    }
-
-    // Check 2: MediaSession
+    // Check 1: MediaSession
     if (navigator.mediaSession && navigator.mediaSession.playbackState === 'playing') {
       return true;
     }
 
-    // Check 3: Audio elements in DOM
+    // Check 2: Audio elements
     const audios = document.querySelectorAll('audio');
     for (const a of audios) {
       if (!a.paused && !a.ended && a.currentTime > 0) return true;
     }
 
-    // Check 4: Play/Pause button state in DOM (Pause icon displayed means track is active & playing)
+    // Check 3: Play/Pause button state in DOM (Pause icon displayed means track is active & playing)
     const playerBar = document.querySelector('[class*="PlayerBar"], [class*="playerBar"], [class*="Player_root"], [data-test-id*="PLAYER"], footer');
     if (playerBar) {
       const pauseIcon = playerBar.querySelector('[data-test-id*="PAUSE"], [aria-label*="Пауза"], [aria-label*="Pause"], [class*="pause"], [class*="Pause"]');
@@ -346,105 +270,15 @@
     return false;
   }
 
-  function getAudioPositionAndDuration(track) {
-    let position = 0;
-    let duration = 0;
-
-    // 1. Check intercepted active audio element (created via document.createElement('audio') or HTMLMediaElement.prototype.play)
-    const activeAudio = window.__ymActiveAudio;
-    if (activeAudio) {
-      if (typeof activeAudio.currentTime === 'number' && isFinite(activeAudio.currentTime) && activeAudio.currentTime >= 0) {
-        position = activeAudio.currentTime;
-      }
-      if (typeof activeAudio.duration === 'number' && isFinite(activeAudio.duration) && activeAudio.duration > 0) {
-        duration = activeAudio.duration;
-      }
+  function getAudioPositionAndDuration() {
+    const audio = document.querySelector('audio');
+    if (audio) {
+      return {
+        position: isFinite(audio.currentTime) ? audio.currentTime : 0,
+        duration: isFinite(audio.duration) ? audio.duration : 0
+      };
     }
-
-    // 2. Check externalAPI.getProgress()
-    if (position <= 0 || duration <= 0) {
-      try {
-        if (window.externalAPI && typeof window.externalAPI.getProgress === 'function') {
-          const p = window.externalAPI.getProgress();
-          if (p) {
-            if (position <= 0 && typeof p.position === 'number' && isFinite(p.position) && p.position >= 0) {
-              position = p.position;
-            }
-            if (duration <= 0 && typeof p.duration === 'number' && isFinite(p.duration) && p.duration > 0) {
-              duration = p.duration;
-            }
-          }
-        }
-      } catch (e) {}
-    }
-
-    // 3. Fallback: Audio element in DOM
-    if (position <= 0 || duration <= 0) {
-      try {
-        const audios = document.querySelectorAll('audio');
-        for (const a of audios) {
-          if (position <= 0 && isFinite(a.currentTime) && a.currentTime > 0) {
-            position = a.currentTime;
-          }
-          if (duration <= 0 && isFinite(a.duration) && a.duration > 0) {
-            duration = a.duration;
-          }
-        }
-      } catch (e) {}
-    }
-
-    // 4. Fallback: Track metadata durationMs
-    if (duration <= 0 && track) {
-      if (typeof track.durationMs === 'number' && track.durationMs > 0) {
-        duration = track.durationMs / 1000;
-      } else if (typeof track.duration === 'number' && track.duration > 0) {
-        duration = track.duration > 1000 ? track.duration / 1000 : track.duration;
-      }
-    }
-
-    // 5. Fallback: Track metadata cache by trackId
-    if (duration <= 0 && track?.id && window.__ymModGetTrackMetaCache) {
-      const cached = window.__ymModGetTrackMetaCache()[track.id];
-      if (cached?.durationMs && cached.durationMs > 0) {
-        duration = cached.durationMs / 1000;
-      }
-    }
-
-    // 6. Fallback: DOM PlayerBar attributes and text
-    if (position <= 0 || duration <= 0) {
-      try {
-        const playerBar = document.querySelector('[class*="PlayerBar"], [class*="playerBar"], [class*="Player_root"], [class*="VibePlayerBar"], [data-test-id*="PLAYER"], footer');
-        if (playerBar) {
-          const slider = playerBar.querySelector('[role="progressbar"], [role="slider"]');
-          if (slider) {
-            const valNow = parseFloat(slider.getAttribute('aria-valuenow'));
-            const valMax = parseFloat(slider.getAttribute('aria-valuemax'));
-            if (position <= 0 && isFinite(valNow) && valNow >= 0) position = valNow;
-            if (duration <= 0 && isFinite(valMax) && valMax > 0) duration = valMax;
-          }
-
-          if (duration <= 0 || position <= 0) {
-            const timeNodes = Array.from(playerBar.querySelectorAll('span, div, p, time'))
-              .filter(el => el.children.length === 0 && /^\s*\d+:\d{2}\s*$/.test(el.textContent));
-            if (timeNodes.length >= 2) {
-              const parseSec = (str) => {
-                const parts = str.trim().split(':');
-                return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
-              };
-              const t1 = parseSec(timeNodes[0].textContent);
-              const t2 = parseSec(timeNodes[1].textContent);
-              if (position <= 0 && isFinite(t1)) position = t1;
-              if (duration <= 0 && isFinite(t2) && t2 > 0) duration = t2;
-            }
-          }
-        }
-      } catch (e) {}
-    }
-
-    return {
-      position: Math.max(0, position),
-      duration: Math.max(0, duration)
-    };
+    return { position: 0, duration: 0 };
   }
 
   function getTrackFromExternalApi() {
@@ -498,7 +332,6 @@
       let artist = '';
       let coverUri = '';
       let album = '';
-      let durationMs = 0;
 
       // Layer 1: MediaSession (accurate in Chromium during playback)
       if (navigator.mediaSession && navigator.mediaSession.metadata) {
@@ -546,8 +379,6 @@
                   if (!title && tr.title) title = tr.title;
                   if (!artist && tr.artists?.[0]?.name) artist = tr.artists[0].name;
                   if (!coverUri && tr.coverUri) coverUri = `https://${tr.coverUri.replace('%%', '400x400')}`;
-                  if (tr.durationMs) durationMs = tr.durationMs;
-                  else if (tr.duration) durationMs = tr.duration > 1000 ? tr.duration : tr.duration * 1000;
                   break;
                 }
               }
@@ -603,8 +434,7 @@
           title: title || 'Неизвестный трек',
           artists: [{ name: artist || 'Яндекс Музыка' }],
           albums: [{ title: album || '' }],
-          coverUri: coverUri || '',
-          durationMs: durationMs || 0
+          coverUri: coverUri || ''
         };
       }
     } catch (e) {}
@@ -924,47 +754,27 @@
   function initDiscordRpcSync() {
     let lastTrackKey = null;
     let lastPlaying = null;
-    let lastPosition = 0;
-    let lastUpdateTimestamp = 0;
 
     setInterval(() => {
       if (!settings.discordRpcEnabled || !window.yandexMod?.updatePlayerState) return;
 
       const isPlaying = isPlayerPlaying();
       const track = getCurrentPlayingTrack();
-      const { position, duration } = getAudioPositionAndDuration(track);
+      const { position, duration } = getAudioPositionAndDuration();
 
       if (!track || !isPlaying) {
         if (lastPlaying) {
           window.yandexMod.updatePlayerState(null);
           lastPlaying = false;
           lastTrackKey = null;
-          lastPosition = 0;
-          lastUpdateTimestamp = 0;
         }
         return;
       }
 
-      const trackKey = `${track.id || track.title}:${track.artists?.[0]?.name || ''}`;
-      const now = Date.now();
-
-      // Detect manual seek only when playback is legitimately active
-      let hasSeeked = false;
-      if (lastUpdateTimestamp > 0 && lastPosition > 0 && position > 0) {
-        const elapsedSec = (now - lastUpdateTimestamp) / 1000;
-        const expectedPos = lastPosition + elapsedSec;
-        if (Math.abs(position - expectedPos) > 5) {
-          hasSeeked = true;
-        }
-      }
-
-      const shouldUpdate = (trackKey !== lastTrackKey) || (isPlaying !== lastPlaying) || hasSeeked;
-
-      if (shouldUpdate) {
+      const trackKey = `${track.id || track.title}:${track.artists?.[0]?.name}:${isPlaying}`;
+      if (trackKey !== lastTrackKey || isPlaying !== lastPlaying) {
         lastTrackKey = trackKey;
         lastPlaying = isPlaying;
-        lastPosition = position;
-        lastUpdateTimestamp = now;
 
         window.yandexMod.updatePlayerState({
           isPlaying: true,
@@ -972,7 +782,7 @@
           position,
           duration
         });
-        console.log('[DiscordRPC] Sent player state update:', track.title, 'by', track.artists?.[0]?.name, `(${position.toFixed(1)}s/${duration.toFixed(1)}s), hasSeeked: ${hasSeeked}`);
+        console.log('[DiscordRPC] Sent player state update:', track.title, 'by', track.artists?.[0]?.name);
       }
     }, 1000);
   }
@@ -1302,7 +1112,12 @@ ${updateInfo.changelog}
     const btn = document.createElement('button');
     btn.id = 'ym-mod-open-btn';
     btn.className = 'ym-mod-nav-btn';
-    btn.innerHTML = `⚡ <span>Настройки мода</span>`;
+    btn.innerHTML = `
+      <svg class="ym-icon-zap" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+      <span>Настройки мода</span>
+    `;
     btn.title = 'Открыть Центр настроек мода (Ctrl+M)';
     btn.onclick = toggleModModal;
 
@@ -1464,7 +1279,10 @@ ${updateInfo.changelog}
       const btn = document.createElement('button');
       btn.className = 'ym-mod-track-dl-btn';
       btn.title = 'Скачать этот трек в MP3/FLAC';
-      btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>`;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v11m0 0l3.5-3.5m-3.5 3.5L8.5 10.5"/>
+        <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+      </svg>`;
 
       btn.onclick = async (e) => {
         e.preventDefault();
@@ -1648,8 +1466,10 @@ ${updateInfo.changelog}
     dlBtn.className = 'ym-mod-player-dl-btn';
     dlBtn.title = 'Скачать текущий трек с обложкой и тегами в MP3/FLAC (Ctrl+D)';
     dlBtn.innerHTML = `
-      <svg viewBox="0 0 24 24">
-        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
       </svg>
     `;
 
@@ -1698,12 +1518,27 @@ ${updateInfo.changelog}
     const exportBtn = document.createElement('button');
     exportBtn.id = 'ym-mod-header-export';
     exportBtn.className = 'ym-mod-header-export-btn';
-    exportBtn.innerHTML = `📄 <span>Сохранить список</span>`;
+    exportBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+      <span>Сохранить список</span>
+    `;
     exportBtn.title = 'Экспортировать этот список в TXT, JSON, M3U8 или CSV';
     exportBtn.onclick = () => openExportMenu(entity, pageTitle);
 
     if (entity.type === 'album') {
-      dlBtn.innerHTML = `⬇️ <span>Скачать альбом</span>`;
+      dlBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      <span>Скачать альбом</span>
+    `;
       dlBtn.onclick = async () => {
         try {
           isDownloadCancelled = false;
@@ -1724,7 +1559,14 @@ ${updateInfo.changelog}
         }
       };
     } else {
-      dlBtn.innerHTML = `⬇️ <span>Скачать плейлист</span>`;
+      dlBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      <span>Скачать плейлист</span>
+    `;
       dlBtn.onclick = async () => {
         try {
           isDownloadCancelled = false;
@@ -1784,7 +1626,9 @@ ${updateInfo.changelog}
             <span>⚡ Yandex Music Mod Center</span>
             <span class="badge">PRO v5.116 PLUS UNLOCKED</span>
           </div>
-          <button class="ym-mod-close-btn" id="ym-mod-close">&times;</button>
+          <button class="ym-mod-close-btn" id="ym-mod-close" title="Закрыть">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
 
         <div class="ym-mod-tabs">
@@ -1889,10 +1733,22 @@ ${updateInfo.changelog}
               <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
                 <div style="font-size: 13px; font-weight: 600; color: #ddd; margin-bottom: 8px;">Резервная копия всей коллекции «Мне нравится»:</div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                  <button class="ym-mod-btn" id="ym-backup-export-json" style="justify-content: center;">📄 Сохранить в JSON</button>
-                  <button class="ym-mod-btn" id="ym-backup-export-txt" style="justify-content: center;">📝 Сохранить в TXT</button>
-                  <button class="ym-mod-btn" id="ym-backup-export-m3u" style="justify-content: center;">🎵 Сохранить в M3U8</button>
-                  <button class="ym-mod-btn" id="ym-backup-export-csv" style="justify-content: center;">📊 Сохранить в CSV</button>
+                  <button class="ym-mod-btn" id="ym-backup-export-json" style="justify-content: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <span>Сохранить в JSON</span>
+                  </button>
+                  <button class="ym-mod-btn" id="ym-backup-export-txt" style="justify-content: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                    <span>Сохранить в TXT</span>
+                  </button>
+                  <button class="ym-mod-btn" id="ym-backup-export-m3u" style="justify-content: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    <span>Сохранить в M3U8</span>
+                  </button>
+                  <button class="ym-mod-btn" id="ym-backup-export-csv" style="justify-content: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    <span>Сохранить в CSV</span>
+                  </button>
                 </div>
               </div>
 
@@ -2408,7 +2264,7 @@ ${updateInfo.changelog}
       checkForModUpdates(false);
     }, 3500);
 
-    console.log('[YandexMusicMod] Mod Client v2.6.6 initialized successfully.');
+    console.log('[YandexMusicMod] Mod Client v2.6.5 initialized successfully.');
   }
 
   if (document.readyState === 'loading') {

@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Yandex Music Desktop Patcher
 # ==============================================================================
 
@@ -42,7 +42,13 @@ if ($runningProcesses) {
 # 2. Locate Yandex Music Installation Path
 Write-Host "[1/4] Поиск установленного приложения Яндекс Музыка..." -ForegroundColor Cyan
 
+$scriptLoc = $PSScriptRoot
+if (-not $scriptLoc) { $scriptLoc = Split-Path -Parent $MyInvocation.MyCommand.Path }
+$parentLoc = if ($scriptLoc) { Split-Path -Parent $scriptLoc } else { $null }
+
 $searchPaths = @(
+    $parentLoc,
+    $scriptLoc,
     "$env:LOCALAPPDATA\Programs\YandexMusic",
     "$env:LOCALAPPDATA\Programs\yandexmusic",
     "$env:LOCALAPPDATA\YandexMusic",
