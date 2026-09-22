@@ -1623,8 +1623,9 @@ ${updateInfo.changelog}
       <div id="ym-mod-modal">
         <div class="ym-mod-header">
           <div class="ym-mod-title">
-            <span>⚡ Yandex Music Mod Center</span>
-            <span class="badge">PRO v5.116 PLUS UNLOCKED</span>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="#ffcc00"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>Yandex Music Mod Center</span>
+            <span class="badge">PRO v5.116.3</span>
           </div>
           <button class="ym-mod-close-btn" id="ym-mod-close" title="Закрыть">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -1632,16 +1633,28 @@ ${updateInfo.changelog}
         </div>
 
         <div class="ym-mod-tabs">
-          <button class="ym-mod-tab active" data-tab="tab-download">📥 Загрузка Музыки</button>
-          <button class="ym-mod-tab" data-tab="tab-backup">📦 Бэкап и Перенос ("Мне нравится")</button>
-          <button class="ym-mod-tab" data-tab="tab-system">✨ Оформление и Опции</button>
+          <button class="ym-mod-tab active" data-tab="tab-download">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Загрузка музыки</span>
+          </button>
+          <button class="ym-mod-tab" data-tab="tab-backup">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            <span>Медиатека и бэкап</span>
+          </button>
+          <button class="ym-mod-tab" data-tab="tab-system">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Система и опции</span>
+          </button>
         </div>
 
         <div class="ym-mod-body">
           <!-- TAB 1: DOWNLOAD -->
           <div class="ym-tab-content" id="tab-download">
             <div class="ym-mod-section">
-              <div class="ym-mod-section-title">📥 Настройки сохранения музыки в файлы</div>
+              <div class="ym-mod-section-title">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Настройки сохранения музыки в файлы</span>
+              </div>
 
               <div class="ym-mod-label">
                 <div class="ym-mod-label-title">Папка для загрузок</div>
@@ -1690,7 +1703,7 @@ ${updateInfo.changelog}
               <div class="ym-mod-row">
                 <div class="ym-mod-label">
                   <div class="ym-mod-label-title">Пропускать уже скачанные треки</div>
-                  <div class="ym-mod-label-desc">Не загружать повторно треки, если они уже сохранены в папке</div>
+                  <div class="ym-mod-label-desc">Мгновенный пропуск треков, если они уже сохранены в папке</div>
                 </div>
                 <label class="ym-mod-switch">
                   <input type="checkbox" id="ym-skip-existing-toggle" ${settings.skipExistingTracks !== false ? 'checked' : ''}>
@@ -1698,17 +1711,20 @@ ${updateInfo.changelog}
                 </label>
               </div>
 
-              <div class="ym-mod-row" style="flex-direction: column; align-items: stretch; gap: 8px; margin-top: 10px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+              <div class="ym-concurrency-card">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div class="ym-mod-label-title">⚡ Одновременных потоков загрузки (Воркеры)</div>
-                  <span id="ym-concurrency-val" style="background: #333; color: #ffcc00; font-weight: 700; font-size: 12px; padding: 2px 10px; border-radius: 12px;">${settings.downloadConcurrency || 3} потока</span>
+                  <div class="ym-mod-label-title" style="display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="#ffcc00"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <span>Одновременных потоков скачивания (Воркеры)</span>
+                  </div>
+                  <span id="ym-concurrency-val" class="ym-concurrency-badge">${settings.downloadConcurrency || 3} потока</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 12px;">
-                  <span style="font-size: 11px; color: #888;">1</span>
-                  <input type="range" id="ym-concurrency-slider" min="1" max="10" step="1" value="${settings.downloadConcurrency || 3}" style="flex: 1; accent-color: #ffcc00; cursor: pointer;">
-                  <span style="font-size: 11px; color: #888;">10</span>
+                <div style="display: flex; align-items: center; gap: 14px;">
+                  <span style="font-size: 12px; color: #888; font-weight: 600;">1</span>
+                  <input type="range" id="ym-concurrency-slider" min="1" max="10" step="1" value="${settings.downloadConcurrency || 3}" style="flex: 1; accent-color: #ffcc00; cursor: pointer; height: 6px;">
+                  <span style="font-size: 12px; color: #888; font-weight: 600;">10</span>
                 </div>
-                <div id="ym-concurrency-desc" class="ym-mod-label-desc" style="margin-top: 2px; font-size: 11px;">
+                <div id="ym-concurrency-desc" class="ym-mod-label-desc" style="font-size: 11.5px; line-height: 1.4;">
                   ${(settings.downloadConcurrency || 3) === 1 ? '🛡️ <b>1 поток:</b> Максимальная безопасность аккаунта (бан исключён)' : ((settings.downloadConcurrency || 3) <= 3 ? '⚡ <b>2-3 потока:</b> Рекомендуемый баланс (быстро и надёжно)' : ((settings.downloadConcurrency || 3) <= 6 ? '🚀 <b>4-6 потоков:</b> Высокая скорость (умеренная нагрузка)' : '🔥 <b>7-10 потоков:</b> Экстремальная скорость (повышенный риск временного бана аккаунта!)'))}
                 </div>
               </div>
@@ -1718,46 +1734,72 @@ ${updateInfo.changelog}
           <!-- TAB 2: BACKUP & PLAYLISTS -->
           <div class="ym-tab-content" id="tab-backup" style="display: none;">
             <div class="ym-mod-section">
-              <div class="ym-mod-section-title">📦 Экспорт коллекций и плейлистов в списки</div>
-              <div class="ym-mod-label-desc" style="margin-bottom: 12px;">
+              <div class="ym-mod-section-title">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                <span>Экспорт коллекций и плейлистов в списки</span>
+              </div>
+              <div class="ym-mod-label-desc" style="margin-bottom: 6px;">
                 Сохраняйте ваши списки воспроизведения в любых форматах (JSON, TXT, M3U8, CSV) для резервного копирования или переноса на другой аккаунт.
               </div>
 
-              <div style="margin-bottom: 14px;">
-                <div class="ym-mod-label-title" style="margin-bottom: 8px;">Быстрый экспорт текущей страницы:</div>
-                <button class="ym-mod-btn ym-mod-btn-primary" id="ym-export-current-page-btn" style="width: 100%; justify-content: center; padding: 10px;">
-                  📑 Экспортировать открытый плейлист / альбом
+              <div style="margin-bottom: 10px;">
+                <button class="ym-mod-btn ym-mod-btn-primary" id="ym-export-current-page-btn" style="width: 100%; justify-content: center; padding: 11px;">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  <span>Экспортировать открытый плейлист / альбом</span>
                 </button>
               </div>
 
-              <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
-                <div style="font-size: 13px; font-weight: 600; color: #ddd; margin-bottom: 8px;">Резервная копия всей коллекции «Мне нравится»:</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                  <button class="ym-mod-btn" id="ym-backup-export-json" style="justify-content: center; gap: 8px;">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                    <span>Сохранить в JSON</span>
-                  </button>
-                  <button class="ym-mod-btn" id="ym-backup-export-txt" style="justify-content: center; gap: 8px;">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                    <span>Сохранить в TXT</span>
-                  </button>
-                  <button class="ym-mod-btn" id="ym-backup-export-m3u" style="justify-content: center; gap: 8px;">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                    <span>Сохранить в M3U8</span>
-                  </button>
-                  <button class="ym-mod-btn" id="ym-backup-export-csv" style="justify-content: center; gap: 8px;">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                    <span>Сохранить в CSV</span>
-                  </button>
+              <div style="background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 14px; margin-bottom: 10px;">
+                <div style="font-size: 13px; font-weight: 600; color: #ddd; margin-bottom: 10px;">Резервная копия всей коллекции «Мне нравится»:</div>
+                <div class="ym-export-grid">
+                  <div class="ym-export-card-btn" id="ym-backup-export-json">
+                    <div class="ym-export-icon-box">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </div>
+                    <div>
+                      <div style="font-weight: 600; font-size: 13px; color: #fff;">JSON-архив</div>
+                      <div style="font-size: 11.5px; color: #888;">Все метаданные и ID</div>
+                    </div>
+                  </div>
+                  <div class="ym-export-card-btn" id="ym-backup-export-txt">
+                    <div class="ym-export-icon-box">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                    </div>
+                    <div>
+                      <div style="font-weight: 600; font-size: 13px; color: #fff;">TXT-список</div>
+                      <div style="font-size: 11.5px; color: #888;">Артист — Название</div>
+                    </div>
+                  </div>
+                  <div class="ym-export-card-btn" id="ym-backup-export-m3u">
+                    <div class="ym-export-icon-box">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    </div>
+                    <div>
+                      <div style="font-weight: 600; font-size: 13px; color: #fff;">M3U8-плейлист</div>
+                      <div style="font-size: 11.5px; color: #888;">Для VLC, AIMP, Foobar</div>
+                    </div>
+                  </div>
+                  <div class="ym-export-card-btn" id="ym-backup-export-csv">
+                    <div class="ym-export-icon-box">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    </div>
+                    <div>
+                      <div style="font-weight: 600; font-size: 13px; color: #fff;">CSV-таблица</div>
+                      <div style="font-size: 11.5px; color: #888;">Для Excel и баз данных</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div class="ym-mod-section-title" style="margin-top: 18px;">🔄 Импорт и перенос музыки</div>
-              <div class="ym-mod-label-desc" style="margin-bottom: 10px;">
+              <div class="ym-mod-section-title" style="margin-top: 14px;">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                <span>Импорт и перенос музыки</span>
+              </div>
+              <div class="ym-mod-label-desc" style="margin-bottom: 8px;">
                 Загрузите сохранённый файл коллекции (JSON, TXT, M3U8 или CSV), чтобы быстро перенести всю музыку на новый или другой аккаунт Яндекс Музыки!
               </div>
 
-              <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+              <div style="background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px; margin-bottom: 12px;">
                 <div style="font-size: 13px; font-weight: 600; color: #ddd; margin-bottom: 8px;">Куда перенести треки:</div>
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                   <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
@@ -1796,15 +1838,18 @@ ${updateInfo.changelog}
           <!-- TAB 3: SYSTEM -->
           <div class="ym-tab-content" id="tab-system" style="display: none;">
             <div class="ym-mod-section">
-              <div class="ym-mod-section-title">✨ Оформление и интеграции</div>
+              <div class="ym-mod-section-title">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span>Системные опции и интеграции</span>
+              </div>
 
               <div class="ym-mod-row">
                 <div class="ym-mod-label">
-                  <div class="ym-mod-label-title">OLED True Black тема</div>
-                  <div class="ym-mod-label-desc">Глубокий чёрный фон #000000 для всех страниц (AMOLED)</div>
+                  <div class="ym-mod-label-title">Сворачивать в трей при закрытии (По умолчанию)</div>
+                  <div class="ym-mod-label-desc">При нажатии на крестик окно сворачивается в фоновый режим без остановки музыки</div>
                 </div>
                 <label class="ym-mod-switch">
-                  <input type="checkbox" id="ym-oled-toggle" ${settings.oledTheme ? 'checked' : ''}>
+                  <input type="checkbox" id="ym-tray-toggle" ${settings.closeToTray !== false ? 'checked' : ''}>
                   <span class="ym-mod-slider"></span>
                 </label>
               </div>
@@ -1812,7 +1857,7 @@ ${updateInfo.changelog}
               <div class="ym-mod-row">
                 <div class="ym-mod-label">
                   <div class="ym-mod-label-title">Discord Rich Presence (RPC)</div>
-                  <div class="ym-mod-label-desc">Отображать текущую песню и обложку в статусе Discord</div>
+                  <div class="ym-mod-label-desc">Отображать текущую песню, альбом и обложку в статусе Discord</div>
                 </div>
                 <label class="ym-mod-switch">
                   <input type="checkbox" id="ym-discord-toggle" ${settings.discordRpcEnabled ? 'checked' : ''}>
@@ -1834,7 +1879,7 @@ ${updateInfo.changelog}
               <div class="ym-mod-row">
                 <div class="ym-mod-label">
                   <div class="ym-mod-label-title">Защита от перезаписи (No Auto-Update)</div>
-                  <div class="ym-mod-label-desc">Блокирует автоматическое обновление клиентом, сохраняя ваши моды</div>
+                  <div class="ym-mod-label-desc">Блокирует автоматическое обновление официальным клиентом</div>
                 </div>
                 <label class="ym-mod-switch">
                   <input type="checkbox" id="ym-update-toggle" ${settings.preventAutoUpdate ? 'checked' : ''}>
@@ -1842,25 +1887,14 @@ ${updateInfo.changelog}
                 </label>
               </div>
 
-              <div class="ym-mod-row">
-                <div class="ym-mod-label">
-                  <div class="ym-mod-label-title">Сворачивать в трей при закрытии</div>
-                  <div class="ym-mod-label-desc">При нажатии на крестик окно сворачивается в фоновый режим</div>
-                </div>
-                <label class="ym-mod-switch">
-                  <input type="checkbox" id="ym-tray-toggle" ${settings.closeToTray ? 'checked' : ''}>
-                  <span class="ym-mod-slider"></span>
-                </label>
-              </div>
-
               <div class="ym-mod-row" style="margin-top: 15px;">
-                <button class="ym-mod-btn" id="ym-open-changelog-btn" style="width: 100%; justify-content: center; padding: 10px;">
-                  📜 Открыть историю изменений (Changelog с GitHub)
+                <button class="ym-mod-btn" id="ym-open-changelog-btn" style="width: 100%; justify-content: center; padding: 11px;">
+                  📜 История изменений мода (Changelog)
                 </button>
               </div>
 
               <div class="ym-mod-row" style="margin-top: 8px;">
-                <button class="ym-mod-btn ym-mod-btn-primary" id="ym-check-updates-btn" style="width: 100%; justify-content: center; padding: 10px;">
+                <button class="ym-mod-btn ym-mod-btn-primary" id="ym-check-updates-btn" style="width: 100%; justify-content: center; padding: 11px;">
                   🔄 Проверить обновления мода
                 </button>
               </div>
@@ -1878,7 +1912,10 @@ ${updateInfo.changelog}
         overlay.querySelectorAll('.ym-tab-content').forEach(c => c.style.display = 'none');
         tab.classList.add('active');
         const contentId = tab.dataset.tab;
-        document.getElementById(contentId).style.display = 'flex';
+        const targetContent = document.getElementById(contentId);
+        if (targetContent) {
+          targetContent.style.display = 'flex';
+        }
       };
     });
 
@@ -1947,12 +1984,6 @@ ${updateInfo.changelog}
         debouncedSaveSettings({ downloadConcurrency: val });
       };
     }
-
-    const oledToggle = document.getElementById('ym-oled-toggle');
-    oledToggle.onchange = (e) => {
-      document.body.classList.toggle('ym-oled-theme', e.target.checked);
-      debouncedSaveSettings({ oledTheme: e.target.checked });
-    };
 
     document.getElementById('ym-discord-toggle').onchange = (e) => {
       debouncedSaveSettings({ discordRpcEnabled: e.target.checked });

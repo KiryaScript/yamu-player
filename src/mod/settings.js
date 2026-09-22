@@ -30,8 +30,7 @@ const defaultSettings = {
   // Developer & System
   preventAutoUpdate: true,
   enableDevTools: true,
-  oledTheme: false,
-  closeToTray: false
+  closeToTray: true
 };
 
 const ALLOWED_SETTING_KEYS = new Set([
@@ -39,7 +38,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'downloadConcurrency', 'skipExistingTracks',
   'embedCover', 'embedTags', 'createArtistFolder', 'createAlbumFolder',
   'showTrackListButtons', 'discordRpcEnabled', 'preventAutoUpdate',
-  'enableDevTools', 'oledTheme', 'closeToTray'
+  'enableDevTools', 'closeToTray'
 ]);
 
 class SettingsManager {
