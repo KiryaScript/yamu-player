@@ -1,6 +1,5 @@
 # ⚡ Yandex Music Enhanced Mod
 
-ОБХОД ПОДПИСКИ ВРЕМЕННО НЕ РАБОТАЕТ. ОЖИДАЙТЕ ОБНОВЛЕНИЯ.
 
 <div align="center">
 
